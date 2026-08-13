@@ -602,9 +602,11 @@ class LiveInstaller:
                 return True
             # NOTE: `<(curl ...)` is bash-only; the TUI runs commands via
             # /bin/sh (dash) which rejects process substitution. The install
-            # script auto-detects non-interactive mode from the pipe.
+            # wizard reads /dev/tty directly, so it must be skipped explicitly
+            # with --skip-setup (our installer writes config.yaml itself).
             return await self._sh(
-                "curl -fsSL https://hermes-agent.nousresearch.com/install.sh | bash"
+                "curl -fsSL https://hermes-agent.nousresearch.com/install.sh "
+                "| bash -s -- --non-interactive --skip-setup"
             )
 
         if key == "apt":
