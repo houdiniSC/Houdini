@@ -5,19 +5,50 @@ WSL2 workspace (Hermes engine) with a full security toolchain and
 knowledge pack. Houdini is your offensive security assistant for testing
 web applications, websites, and mobile APKs.
 
-## One-liner (PowerShell)
+## Install (fastest: git clone)
+
+Clone once (the package and the rootfs chunks download together), then run
+the bootstrap from the clone — it reuses the bundled rootfs, no second
+download:
+
+```powershell
+git clone https://github.com/houdiniSC/Houdini.git
+cd Houdini
+.\bootstrap-wsl.ps1
+```
+
+Creates an isolated WSL distro (`HoudiniGateway`) running the Houdini agent
+(Hermes engine + full toolchain) and launches the terminal wizard. Provide
+the rootfs locally to skip even the clone's rootfs download:
+
+```powershell
+$RootfsPath = 'C:\path\to\ubuntu-rootfs.tar.gz'; .\bootstrap-wsl.ps1
+```
+
+## One-liner (PowerShell, from GitHub)
 
 ```powershell
 $src = 'https://raw.githubusercontent.com/houdiniSC/Houdini/main'; irm "$src/bootstrap-wsl.ps1" | iex
 ```
 
-Creates an isolated WSL distro (`HoudiniGateway`) running the Houdini agent
-(Hermes engine + full toolchain) and launches the terminal wizard. Provide
-the rootfs locally to skip the download:
+The one-liner downloads the repo zip once and reuses the rootfs chunks
+inside it (no extra rootfs download). Or point it at a local rootfs:
 
 ```powershell
 $src = 'https://raw.githubusercontent.com/houdiniSC/Houdini/main'; $RootfsPath = 'C:\path\to\ubuntu-rootfs.tar.gz'; irm "$src/bootstrap-wsl.ps1" | iex
 ```
+
+## Remove the distro
+
+Stop and delete the WSL distribution completely (filesystem, agent user,
+services, and its Windows menu entry):
+
+```powershell
+wsl --unregister HoudiniGateway
+```
+
+The cached rootfs in `%TEMP%\hermes-rootfs.tar.gz` stays behind — delete it
+manually for a fully clean slate.
 
 ## Config
 
