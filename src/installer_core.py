@@ -730,9 +730,15 @@ class LiveInstaller:
                     ) and ok
             if "jadx" in wanted and not tool_path("jadx"):
                 self.on_log("installing jadx ...")
+                # Ubuntu 24.04 dropped the jadx apt package: install the JRE
+                # separately, then try apt, then the official GitHub release.
                 ok = await self._sh(
-                    "sudo apt-get install -y -qq openjdk-17-jre-headless jadx"
+                    "sudo apt-get install -y -qq openjdk-17-jre-headless"
                 ) and ok
+                if not tool_path("jadx"):
+                    ok = await self._sh(
+                        "sudo apt-get install -y -qq jadx"
+                    ) and ok
                 if not tool_path("jadx"):
                     ok = await self._sh(
                         "cd /tmp && curl -fsSL -o jadx.zip "
@@ -742,8 +748,11 @@ class LiveInstaller:
                     ) and ok
             if "frida" in wanted and not tool_path("frida"):
                 self.on_log("installing frida-tools + objection ...")
+                # --ignore-installed: Debian's blinker has no RECORD file, so
+                # pip cannot uninstall it and fails without this flag.
                 ok = await self._sh(
-                    "sudo python3 -m pip install --break-system-packages -q frida-tools objection"
+                    "sudo python3 -m pip install --break-system-packages "
+                    "--ignore-installed -q frida-tools objection"
                 ) and ok
             return ok
 
@@ -794,6 +803,13 @@ class LiveInstaller:
             src_toolkit = PACK_DIR / "toolkit"
             if src_toolkit.is_dir():
                 shutil.copytree(src_toolkit, HERMES_HOME / "toolkit", dirs_exist_ok=True)
+            # Windows checkouts can carry CRLF line endings, which breaks bash
+            # scripts (e.g. toolkit-scan.sh). Normalize .sh files in the distro.
+            await self._sh(
+                f"find {shlex.quote(str(HERMES_HOME / 'toolkit'))} "
+                f"{shlex.quote(str(HERMES_HOME / 'skills'))} -name '*.sh' "
+                "-exec sed -i 's/\\r$//' {} +"
+            )
             idx = HERMES_HOME / "toolkit" / "tools" / "build-skills-index.py"
             if idx.is_file():
                 await self._sh(

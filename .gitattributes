@@ -1,0 +1,11 @@
+# Force LF for text files so Windows checkouts never break bash/python
+* text=auto
+*.sh text eol=lf
+*.py text eol=lf
+*.ps1 text eol=lf
+*.md text eol=lf
+*.yaml text eol=lf
+*.yml text eol=lf
+*.json text eol=lf
+*.toml text eol=lf
+*.txt text eol=lf
