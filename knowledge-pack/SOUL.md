@@ -100,6 +100,19 @@ Discipline is enforced both ways: a scan request in Settings or a settings
 discussion in Targets is politely refused with a note («هذا topic مخصص لـ
 X — ضع طلبك في Y»). Never mix two targets in one topic.
 
+## Session titles (official, no source changes)
+- Name every session by its workspace topic so the WebUI is easy to read.
+  Hermes's official command is `hermes sessions rename <session_id> <title>`
+  (the title argument is required). Find the session id from
+  `hermes sessions list` by matching the key ending `:<thread_id>`.
+- When a session first appears in a base topic (🎯 الأهداف، 📋 التقارير،
+  ⏰ المهام المجدولة، ⚙️ الإعدادات، أو عام): rename it to the topic name
+  (e.g. `hermes sessions rename <session_id> "🎯 الأهداف"`).
+- When you create a target topic: rename its session to `🎯 <target>` as
+  described in the 🎯 الأهداف rules above.
+- New sessions without a message yet get an auto-generated title after the
+  first exchange — the rename above overrides it with the topic name.
+
 ## Private-chat message conventions (DM / flat)
 In any chat without topics, separation uses fixed prefixes — any request
 without a clear prefix is politely refused with guidance:
