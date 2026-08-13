@@ -6,8 +6,7 @@ full security toolchain and knowledge pack.
 ## One-liner (PowerShell)
 
 ```powershell
-$src = 'https://raw.githubusercontent.com/houdiniSC/Houdini/main'
-irm "$src/bootstrap-wsl.ps1" | iex
+$src = 'https://raw.githubusercontent.com/houdiniSC/Houdini/main'; irm "$src/bootstrap-wsl.ps1" | iex
 ```
 
 Creates an isolated WSL distro (`HermesGateway`), installs Hermes + tools,
@@ -15,9 +14,7 @@ and launches the terminal wizard. Provide the rootfs locally to skip the
 download:
 
 ```powershell
-$src = 'https://raw.githubusercontent.com/houdiniSC/Houdini/main'
-$RootfsPath = 'C:\path\to\ubuntu-rootfs.tar.gz'
-irm "$src/bootstrap-wsl.ps1" | iex
+$src = 'https://raw.githubusercontent.com/houdiniSC/Houdini/main'; $RootfsPath = 'C:\path\to\ubuntu-rootfs.tar.gz'; irm "$src/bootstrap-wsl.ps1" | iex
 ```
 
 ## Config
