@@ -94,6 +94,10 @@ def main() -> None:
     secrets["vulners"] = read_first(HOME / ".config" / "vulners" / "api.key")
     secrets["nvd"] = read_first(HOME / ".config" / "nvd" / "api.key")
 
+    vk = HERMES / "toolkit" / "keys"
+    secrets["vpn_user"] = read_first(vk / "vpn_user.key")
+    secrets["vpn_pass"] = read_first(vk / "vpn_pass.key")
+
     wp = HOME / ".wpscan" / "scan.json"
     if wp.is_file():
         try:

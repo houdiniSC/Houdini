@@ -61,7 +61,8 @@ mkdir -p "${TK}/keys"
   check_key ngrok     "${HOME}/.config/ngrok/ngrok.yml" ngrok
   check_key subfinder "${HOME}/.config/subfinder/provider-config.yaml" config
   check_key uncover   "${HOME}/.config/uncover/provider-config.yaml" config
-  check_key vpn       "${HOME}/vpn-profiles/auth.txt" config
+  check_key vpn_user  "${HOME}/.hermes/toolkit/keys/vpn_user.key" config
+  check_key vpn_pass  "${HOME}/.hermes/toolkit/keys/vpn_pass.key" config
 
   printf '\nextra_keys:\n'
   found=0
