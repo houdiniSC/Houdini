@@ -30,7 +30,6 @@ APT_TOOLS = {
     "gobuster": "gobuster",
     "ffuf": "ffuf",
     "whatweb": "whatweb",
-    "openvpn": "openvpn",
 }
 PD_TOOLS = [
     ("nuclei", "v3.11.0", "nuclei_3.11.0_linux_amd64.zip"),
@@ -52,7 +51,6 @@ TOOLS = [
     ("droopescan", "Drupal scanner", "uv"),
     ("drupwn", "Drupal enumeration", "uv"),
     ("ngrok", "tunnels / callbacks", "ngrok"),
-    ("openvpn", "VPN egress", "apt"),
     ("browser-capture", "browser traffic capture (Playwright + mitmproxy)", "browser"),
     ("apktool", "APK decode / rebuild", "mobile"),
     ("jadx", "APK decompiler", "mobile"),
@@ -87,15 +85,12 @@ SECRET_FIELDS = [
     ("vulndb", "vulners", "Vulners API key", True, "vulners"),
     ("vulndb", "wpscan", "WPScan API token", True, "wpscan"),
     ("network", "ngrok", "ngrok authtoken", True, "ngrok"),
-    ("network", "vpn_user", "VPN username", False, "vpn"),
-    ("network", "vpn_pass", "VPN password", True, "vpn"),
-    ("network", "vpn_profiles_dir", "VPN profiles folder (copies *.ovpn)", False, "vpn"),
     ("search", "brave", "Brave Search API key", True, "env"),
     ("search", "serpapi", "SerpAPI key", True, "env"),
 ]
 
 SUDO_MODES = [
-    ("restricted", "Restricted (recommended)", "openvpn, systemctl, apt, nmap, tcpdump, docker"),
+    ("restricted", "Restricted (recommended)", "systemctl, apt, nmap, tcpdump, docker"),
     ("wide", "Wide (everything)", "NOPASSWD: ALL"),
     ("none", "None", "leave sudo as-is"),
 ]
@@ -316,63 +311,6 @@ def provision_keys(secrets: dict, on_log: Callable[[str], None] | None = None) -
             path.write_text(fmt(secrets[fid]), encoding="utf-8")
             os.chmod(path, 0o600)
             log(f"{fid} provisioned ({mask(secrets[fid])})")
-
-    # 5) vpn auth
-    if secrets.get("vpn_user") or secrets.get("vpn_pass"):
-        vp = home / "vpn-profiles" / "auth.txt"
-        vp.parent.mkdir(parents=True, exist_ok=True)
-        vp.write_text(
-            f"{secrets.get('vpn_user', '')}\n{secrets.get('vpn_pass', '')}\n", encoding="utf-8"
-        )
-        os.chmod(vp, 0o600)
-
-    # 5b) vpn profiles — copy from a local folder, or from per-profile
-    # path/URL entries. Files land flat in ~/vpn-profiles/ so the toolkit
-    # scanner indexes them (count + names). No secrets are stored in memory.
-    vpn_dir = home / "vpn-profiles"
-    vpn_dir.mkdir(parents=True, exist_ok=True)
-    src_dir = str(secrets.get("vpn_profiles_dir") or "").strip()
-    if src_dir:
-        pdir = Path(src_dir).expanduser()
-        if pdir.is_dir():
-            copied = 0
-            for f in sorted(pdir.glob("*.ovpn")):
-                shutil.copy2(f, vpn_dir / f.name)
-                os.chmod(vpn_dir / f.name, 0o600)
-                copied += 1
-            log(f"vpn profiles copied from {src_dir} ({copied})")
-        else:
-            log(f"vpn_profiles_dir not found: {src_dir}")
-    for item in secrets.get("vpn_profiles") or []:
-        if not isinstance(item, dict):
-            continue
-        name = str(item.get("name") or "").strip()
-        source = str(item.get("source") or "").strip()
-        if not source:
-            continue
-        if not name:
-            name = Path(source).name
-        target = vpn_dir / name
-        if not target.suffix:
-            target = target.with_suffix(".ovpn")
-        try:
-            if source.startswith(("http://", "https://")):
-                import urllib.request
-
-                with urllib.request.urlopen(source, timeout=30) as resp:
-                    raw = resp.read()
-                target.write_bytes(raw)
-                log(f"vpn profile downloaded: {target.name}")
-            else:
-                srcf = Path(source).expanduser()
-                if not srcf.is_file():
-                    log(f"vpn profile not found: {source}")
-                    continue
-                shutil.copy2(srcf, target)
-                log(f"vpn profile copied: {target.name}")
-            os.chmod(target, 0o600)
-        except Exception as exc:
-            log(f"vpn profile failed ({name}): {exc}")
 
     # 6) provider configs — built from the SAME master keys (no duplication)
     provider_map = {
@@ -704,7 +642,7 @@ class LiveInstaller:
                 line = f"{user} ALL=(ALL) NOPASSWD: ALL"
             else:
                 line = (
-                    f"{user} ALL=(ALL) NOPASSWD: /usr/sbin/openvpn, /usr/bin/systemctl, "
+                    f"{user} ALL=(ALL) NOPASSWD: /usr/bin/systemctl, "
                     "/usr/bin/apt, /usr/bin/apt-get, /usr/bin/nmap, /usr/sbin/tcpdump, /usr/bin/docker"
                 )
             dest = f"/etc/sudoers.d/hermes-{user}"

@@ -487,9 +487,6 @@ class WizardScreen(Screen):
             if val:
                 self.query_one(f"#{fid}", Input).value = val
                 count += 1
-        vp_list = secrets_cfg.get("vpn_profiles") or []
-        if isinstance(vp_list, list) and vp_list:
-            self.app.data["secrets"]["vpn_profiles"] = vp_list
         self.app.data["secrets_count"] = count
 
         mode = cfg.get("sudo_mode")
@@ -625,12 +622,6 @@ class WizardScreen(Screen):
             if data.get("memory", True)
             else "disabled",
         )
-        vp = data.get("secrets", {}).get("vpn_profiles") or []
-        vp_dir = data.get("secrets", {}).get("vpn_profiles_dir") or ""
-        vp_desc = f"{len(vp)} entries" if vp else "none"
-        if vp_dir:
-            vp_desc += f" + folder: {vp_dir}"
-        table.add_row("VPN profiles", vp_desc)
         table.add_row("Config loaded", "yes" if self.config_loaded else "no")
 
     # ------------------------------------------------------------ install

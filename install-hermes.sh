@@ -110,7 +110,7 @@ fi
 ui_info "Tools" "تثبيت أدوات apt (nmap, nikto, sqlmap ...)"
 sudo apt-get update -qq >> "$LOG" 2>&1
 sudo apt-get install -y -qq nmap nikto sqlmap gobuster ffuf whatweb dnsutils \
-  netcat-openbsd jq unzip openvpn >> "$LOG" 2>&1
+  netcat-openbsd jq unzip >> "$LOG" 2>&1
 
 for p in "nuclei v3.11.0 nuclei_3.11.0_linux_amd64.zip" \
          "subfinder v2.15.0 subfinder_2.15.0_linux_amd64.zip" \
@@ -231,9 +231,6 @@ ask_sec fofa "Recon - Fofa" "مفتاح Fofa (email:key)" fofa
 ask_sec vulners "Vulners" "مفتاح Vulners" vulners
 ask_sec wpscan "WPScan" "توكن WPScan" wpscan
 ask_sec ngrok "ngrok" "ngrok authtoken" ngrok
-ask_sec vpn_user "VPN" "اسم مستخدم VPN" vpn_user
-ask_sec vpn_pass "VPN" "كلمة مرور VPN" vpn_pass
-ask_sec vpn_profiles_dir "VPN" "مجلد بروفيلات OpenVPN (.ovpn)" vpn_profiles_dir
 ask_sec brave "Search" "Brave Search API key" brave
 ask_sec serpapi "Search" "SerpAPI key" serpapi
 ask_sec nvd "NVD" "NVD API key" nvd
@@ -252,7 +249,7 @@ case "$SUDO_MODE" in
     SUDOERS_LINE="$USER ALL=(ALL) NOPASSWD: ALL"
     ;;
   *مقنّن*)
-    SUDOERS_LINE="$USER ALL=(ALL) NOPASSWD: /usr/sbin/openvpn, /usr/bin/systemctl, /usr/bin/apt, /usr/bin/apt-get, /usr/bin/nmap, /usr/sbin/tcpdump, /usr/bin/docker"
+    SUDOERS_LINE="$USER ALL=(ALL) NOPASSWD: /usr/bin/systemctl, /usr/bin/apt, /usr/bin/apt-get, /usr/bin/nmap, /usr/sbin/tcpdump, /usr/bin/docker"
     ;;
   *)
     SUDOERS_LINE=""
@@ -368,20 +365,6 @@ if [ -n "$shodan" ] || [ -n "$zoomeye" ]; then
     [ -n "$zoomeye" ] && printf 'zoomeye:\n  - "%s"\n' "$zoomeye"
   } > "$HOME/.config/uncover/provider-config.yaml"
   chmod 600 "$HOME/.config/uncover/provider-config.yaml"
-fi
-if [ -n "$vpn_user" ] || [ -n "$vpn_pass" ]; then
-  mkdir -p "$HOME/vpn-profiles"
-  printf '%s\n%s\n' "$vpn_user" "$vpn_pass" > "$HOME/vpn-profiles/auth.txt"
-  chmod 600 "$HOME/vpn-profiles/auth.txt"
-fi
-if [ -n "$vpn_profiles_dir" ] && [ -d "$vpn_profiles_dir" ]; then
-  mkdir -p "$HOME/vpn-profiles"
-  for f in "$vpn_profiles_dir"/*.ovpn; do
-    [ -f "$f" ] || continue
-    cp "$f" "$HOME/vpn-profiles/"
-    chmod 600 "$HOME/vpn-profiles/$(basename "$f")"
-  done
-  ui_info "VPN" "تم نسخ بروفيلات OpenVPN من $vpn_profiles_dir"
 fi
 
 # ── 7) Toolkit first scan + hourly refresh ─────────────────────────────────

@@ -108,14 +108,6 @@ def main() -> None:
                 secrets["ngrok"] = line.split(":", 1)[1].strip()
                 break
 
-    vpn = HOME / "vpn-profiles" / "auth.txt"
-    if vpn.is_file():
-        lines = vpn.read_text(encoding="utf-8").splitlines()
-        if lines:
-            secrets["vpn_user"] = lines[0]
-        if len(lines) > 1:
-            secrets["vpn_pass"] = lines[1]
-
     secrets = {k: v for k, v in secrets.items() if v}
     config = {
         "config_version": 3,
