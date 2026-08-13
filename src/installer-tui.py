@@ -58,15 +58,17 @@ from installer_core import (
 # --------------------------------------------------------------------------
 # Palette
 # --------------------------------------------------------------------------
-CYAN = "#22D3EE"
-BLUE = "#4F8CFF"
-VIOLET = "#8B5CF6"
-EMERALD = "#34D399"
-AMBER = "#FBBF24"
-RED = "#F87171"
-SLATE = "#94A3B8"
-SLATE_DIM = "#475569"
-SLATE_FAINT = "#334155"
+# gruvbox palette
+CYAN = "#8EC07C"      # aqua
+BLUE = "#83A598"
+VIOLET = "#D3869B"    # purple
+EMERALD = "#B8BB26"   # green
+AMBER = "#FABD2F"     # yellow
+ORANGE = "#FE8019"
+RED = "#FB4934"
+SLATE = "#D5C4A1"     # fg2
+SLATE_DIM = "#BDAE93" # fg3
+SLATE_FAINT = "#928374"  # gray
 
 TOOL_CAT_LABELS = {
     "pd": "ProjectDiscovery",
@@ -95,7 +97,7 @@ STEP_DEFS = [
 ]
 
 STEP_HINTS = {
-    "welcome": "Press Start to configure the isolated Houdini gateway.",
+    "welcome": "Press Start Installation to begin.",
     "config": "Optional: paste a local path or an http(s) URL, then Load & Apply.",
     "core": "Required: pick an AI provider, choose the model and enter its API key. Bot token starts the gateway. Everything else can be added later.",
     "decide": "All tools install by default. Continue to customize, or Quick Install with defaults.",
@@ -131,8 +133,31 @@ class WizardScreen(Screen):
                 with ContentSwitcher(id="steps"):
                     with Vertical(id="step-welcome", classes="step"):
                         yield Static("", id="welcome_gradient")
-                        yield Static("HOUDINI", id="content_logo")
-                        yield Static("LIVE console wizard - Ubuntu installer style", id="content_sub")
+                        yield Static(
+                            "      /\\\n"
+                            "     /  \\\n"
+                            "    / /\\ \\\n"
+                            "   / /__\\ \\\n"
+                            "  /________\\\n"
+                            " /__________\\\n"
+                            "/____________\\\n"
+                            "\\____________/",
+                            id="hat_logo",
+                        )
+                        yield Static(
+                            "█ █ ███ █ █ ██  ███ █ █\n"
+                            "███ █ █ █ █ █ █  █   ███\n"
+                            "█ █ ███ █ █ ██  ███ █ █",
+                            id="content_logo",
+                        )
+                        yield Static(
+                            "The security wizard for testing web apps & sites",
+                            id="content_sub",
+                        )
+                        yield Static(
+                            "الساحر هوديني — مساعدك الأمني لفحص التطبيقات والمواقع",
+                            id="welcome_arabic",
+                        )
                         yield Static(
                             f"- [{EMERALD}]+[/] Live apt / binary installation\n"
                             f"- [{EMERALD}]+[/] Dynamic tool & key inventory\n"
@@ -140,6 +165,11 @@ class WizardScreen(Screen):
                             f"- [{EMERALD}]+[/] Encrypted config load (path or URL)\n"
                             f"- [{EMERALD}]+[/] Gateway ready on first run",
                             id="welcome_features",
+                        )
+                        yield Button(
+                            "Start Installation",
+                            id="welcome_start",
+                            variant="primary",
                         )
                         yield Static(
                             f"[{SLATE}]Your sudo password may be requested once during installation.[/]",
@@ -437,6 +467,9 @@ class WizardScreen(Screen):
         if bid == "decide_quick":
             self._quick_defaults()
             await self._show("review")
+            return
+        if bid == "welcome_start":
+            await self._show("config")
             return
         if bid != "next":
             return
@@ -875,23 +908,23 @@ class HoudiniInstaller(App):
     SUB_TITLE = "terminal wizard"
     BINDINGS = [Binding("q", "quit", "Quit")]
     THEMES = {
-        "neural": Theme(
-            name="neural",
+        "gruvbox": Theme(
+            name="gruvbox",
             primary=BLUE,
             secondary=VIOLET,
             accent=CYAN,
             success=EMERALD,
-            warning=AMBER,
+            warning=ORANGE,
             error=RED,
-            foreground="#E2E8F0",
-            background="#05070D",
-            surface="#0A0F1A",
-            panel="#0D1524",
-            boost="#12203A",
+            foreground="#EBDBB2",
+            background="#282828",
+            surface="#1D2021",
+            panel="#3C3836",
+            boost="#504945",
             dark=True,
         )
     }
-    THEME = "neural"
+    THEME = "gruvbox"
 
     CSS = """
     Screen { background: $background; }
@@ -929,11 +962,15 @@ class HoudiniInstaller(App):
     Button { margin: 0 1; }
     Button:hover { background: $primary; color: $background; }
 
+    #step-welcome { align: center middle; }
+    #hat_logo { color: $accent; text-style: bold; margin-bottom: 1; }
     #content_logo { text-style: bold; color: $accent; text-align: center; }
-    #content_sub { text-align: center; color: $text-muted; margin-bottom: 1; }
+    #content_sub { text-align: center; color: $text-muted; }
+    #welcome_arabic { text-align: center; color: $text-muted; margin-bottom: 1; }
     #welcome_gradient { height: 2; margin-bottom: 1; }
-    #welcome_features { margin: 1 0; }
-    #welcome_note { margin-top: 1; }
+    #welcome_features { margin: 1 0; color: $text-muted; }
+    #welcome_start { margin-top: 1; }
+    #welcome_note { margin-top: 1; color: $text-muted; }
 
     #cfg_source, #cfg_password { margin-bottom: 1; }
     #cfg_row { height: auto; align: left middle; margin-bottom: 1; }
@@ -988,7 +1025,8 @@ async def selftest() -> None:
 
             await pilot.pause()
             assert app.screen is not None
-            await press("next")  # welcome -> config
+            assert app.screen.query_one("#welcome_start", Button) is not None
+            await press("welcome_start")  # welcome -> config
             await press("next")  # config (skip) -> core
             app.screen.query_one("#api_key", Input).value = "sk-demo-value"
             app.screen.query_one("#bot", Input).value = "123:demo-token"
