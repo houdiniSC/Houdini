@@ -452,6 +452,7 @@ class WizardScreen(Screen):
         idx = self._step_index(self.current)
 
         if bid == "back" and idx > 0 and self.current not in ("install", "summary"):
+            self._collect_current()
             await self._show(STEP_DEFS[idx - 1][0])
             return
         if bid == "cfg_load":
@@ -461,9 +462,11 @@ class WizardScreen(Screen):
             await self._show("core")
             return
         if bid == "decide_custom":
+            self._collect_current()
             await self._show("tools")
             return
         if bid == "decide_quick":
+            self._collect_current()
             self._quick_defaults()
             await self._show("review")
             return
@@ -716,6 +719,19 @@ class WizardScreen(Screen):
     def _collect_memory(self) -> None:
         self.app.data["memory"] = self.query_one("#memory_enable", Checkbox).value
 
+    def _collect_current(self) -> None:
+        """Persist the current step's inputs before navigating away (tabs/back)."""
+        if self.current == "core":
+            self._collect_core()
+        elif self.current == "tools":
+            self._collect_tools()
+        elif self.current == "secrets":
+            self._collect_secrets()
+        elif self.current == "webui":
+            self._collect_webui()
+        elif self.current == "memory":
+            self._collect_memory()
+
     # ------------------------------------------------------------ events
     @staticmethod
     def _list_item_label(item) -> str:
@@ -744,6 +760,7 @@ class WizardScreen(Screen):
             return  # do not leave the live-install step mid-run
         if tid == "summary" and not self.install_done:
             return
+        self._collect_current()
         await self._show(tid)
 
     def on_radio_set_changed(self, event: RadioSet.Changed) -> None:
@@ -1126,6 +1143,32 @@ async def selftest() -> None:
         assert app3.data["secrets"]["model"] == "my-custom-model"
         assert app3.data["secrets"]["model_base_url"] == "https://my-gw.example/v1"
         assert app3.data["secrets"]["api_key"] == "sk-custom-demo"
+
+    # tab navigation must collect the current step's inputs before leaving
+    app4 = HoudiniInstaller(dry_run=True)
+    async with app4.run_test(size=(140, 46)) as pilot4:
+        async def press4(bid: str) -> None:
+            app4.screen.query_one(f"#{bid}", Button).press()
+            await pilot4.pause()
+
+        await pilot4.pause()
+        await press4("next")  # welcome -> config
+        await press4("next")  # config (skip) -> core
+        rs4 = app4.screen.query_one("#model_providers", RadioSet)
+        for rb in rs4.query(RadioButton):
+            if rb.label is not None and rb.label.plain.startswith("Custom"):
+                rb.value = True
+                break
+        await pilot4.pause()
+        app4.screen.query_one("#model_base_url", Input).value = "https://tab-gw.example/v1"
+        app4.screen.query_one("#api_key", Input).value = "sk-tab-demo"
+        app4.screen.query_one("#model", Input).value = "tab-model"
+        app4.screen.query_one("#step_tabs", Tabs).active = "decide"  # tab jump, not Next
+        await pilot4.pause()
+        assert app4.data["secrets"]["model_provider"] == "custom"
+        assert app4.data["secrets"]["model"] == "tab-model"
+        assert app4.data["secrets"]["model_base_url"] == "https://tab-gw.example/v1"
+        assert app4.data["secrets"]["api_key"] == "sk-tab-demo"
     print("selftest OK")
 
 
