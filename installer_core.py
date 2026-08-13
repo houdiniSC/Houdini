@@ -554,8 +554,11 @@ class LiveInstaller:
             if tool_path("hermes"):
                 self.on_log("Hermes already installed — skipping")
                 return True
+            # NOTE: `<(curl ...)` is bash-only; the TUI runs commands via
+            # /bin/sh (dash) which rejects process substitution. The install
+            # script auto-detects non-interactive mode from the pipe.
             return await self._sh(
-                "bash <(curl -fsSL https://hermes-agent.nousresearch.com/install.sh) --non-interactive"
+                "curl -fsSL https://hermes-agent.nousresearch.com/install.sh | bash"
             )
 
         if key == "apt":

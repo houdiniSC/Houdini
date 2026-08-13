@@ -102,7 +102,7 @@ if command -v hermes >/dev/null 2>&1; then
   ui_info "Hermes" "✓ Hermes موجود: $(hermes --version 2>/dev/null | head -1)"
 else
   ui_info "Hermes" "جاري تثبيت Hermes Agent..."
-  bash <(curl -fsSL https://hermes-agent.nousresearch.com/install.sh) --non-interactive >> "$LOG" 2>&1 \
+  curl -fsSL https://hermes-agent.nousresearch.com/install.sh | bash >> "$LOG" 2>&1 \
     || { ui_box "Error" 8 60 "✗ فشل تثبيت Hermes — شاهد $LOG"; exit 1; }
 fi
 
