@@ -215,6 +215,11 @@ class WizardScreen(Screen):
                             placeholder="Base URL (auto-filled for presets; required for Custom)",
                             id="model_base_url",
                         )
+                        yield Input(
+                            placeholder="API key (sk-...)",
+                            password=True,
+                            id="api_key",
+                        )
                         yield Select(
                             [],
                             prompt="Model list (live - click to pick)",
@@ -225,11 +230,6 @@ class WizardScreen(Screen):
                         yield Input(
                             placeholder="Model ID (pick from the list or type custom)",
                             id="model",
-                        )
-                        yield Input(
-                            placeholder="API key (sk-...)",
-                            password=True,
-                            id="api_key",
                         )
                         yield Input(
                             placeholder="Telegram bot token (@BotFather)",
@@ -1101,6 +1101,31 @@ async def selftest() -> None:
         assert app2.data["secrets"]["api_key"] == "sk-demo"
         assert app2.data["secrets"]["model_provider"] == "deepseek"
         assert app2.data["secrets_count"] == 1
+
+    # custom-provider path: base URL + key + model must all reach secrets
+    app3 = HoudiniInstaller(dry_run=True)
+    async with app3.run_test(size=(140, 46)) as pilot3:
+        async def press3(bid: str) -> None:
+            app3.screen.query_one(f"#{bid}", Button).press()
+            await pilot3.pause()
+
+        await pilot3.pause()
+        await press3("next")  # welcome -> config
+        await press3("next")  # config (skip) -> core
+        rs3 = app3.screen.query_one("#model_providers", RadioSet)
+        for rb in rs3.query(RadioButton):
+            if rb.label is not None and rb.label.plain.startswith("Custom"):
+                rb.value = True
+                break
+        await pilot3.pause()
+        app3.screen.query_one("#model_base_url", Input).value = "https://my-gw.example/v1"
+        app3.screen.query_one("#api_key", Input).value = "sk-custom-demo"
+        app3.screen.query_one("#model", Input).value = "my-custom-model"
+        await press3("next")  # core -> decide
+        assert app3.data["secrets"]["model_provider"] == "custom"
+        assert app3.data["secrets"]["model"] == "my-custom-model"
+        assert app3.data["secrets"]["model_base_url"] == "https://my-gw.example/v1"
+        assert app3.data["secrets"]["api_key"] == "sk-custom-demo"
     print("selftest OK")
 
 
