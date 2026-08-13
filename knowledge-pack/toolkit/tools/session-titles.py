@@ -15,9 +15,10 @@ Run with any python3:
 from __future__ import annotations
 
 import json
+import os
 from pathlib import Path
 
-HERMES = Path.home() / ".hermes"
+HERMES = Path(os.environ.get("HERMES_HOME") or (Path.home() / ".hermes"))
 SESSION_PY = HERMES / "hermes-agent" / "gateway" / "session.py"
 TITLES = HERMES / "topic_titles.json"
 WORKSPACE = HERMES / "workspace_topics.json"
