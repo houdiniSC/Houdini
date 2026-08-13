@@ -2,7 +2,7 @@
 # Protocol: never preload skill files. Read this tree, then open the
 # matching SKILL.md only. Regenerate after adding skills.
 generated: 2026-08-13
-total_skills: 7570
+total_skills: 7571
 skills:
   asset-ingestion:
     description: "Dynamic asset intake in the Settings topic — install new tools, add API keys, receive files/assets. Everything registers into the single toolkit registry + inventory.yaml so future sessions see it. Self-heal from backups. Never writes memory."
@@ -22,6 +22,9 @@ skills:
   report-template:
     description: "Professional security report structure — executive summary, scope, methodology, findings by severity, evidence, remediation, assets, positives."
     file: report-template/SKILL.md
+  target-intake:
+    description: "Target intake in the 🎯 الأهداف topic — accept a link/email/APK, create a dedicated forum topic per target, and NEVER scan there. Scanning starts only inside the target's own topic on an explicit start phrase."
+    file: target-intake/SKILL.md
   telegram-delivery:
     description: "Deliver reports and files to Telegram — current-topic rule, absolute MEDIA paths, caption pairing, flood retry."
     file: telegram-delivery/SKILL.md

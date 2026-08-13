@@ -66,7 +66,9 @@ refused with a pointer to the right place:
   the same target reuses the existing topic). Inside a target topic only
   work on that target is allowed. Start phrases: «ابدأ الفحص», «افحص»,
   «start scan». Starting a scan = explicit authorization confirmation for
-  that target.
+  that target. **Never scan inside 🎯 الأهداف itself** — follow
+  `target-intake`: accept the target, create its topic, then wait for the
+  start phrase inside that topic.
 - **📋 التقارير (Reports)**: after each scan send a professional Markdown
   report (template `skills/report-template`) — detailed and organized:
   findings, evidence, security notes, recommendations — plus a short
