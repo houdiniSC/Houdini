@@ -587,6 +587,22 @@ class LiveInstaller:
                 self.on_log(text)
         return (await proc.wait()) == 0
 
+    async def _sh_out(self, cmd: str) -> str:
+        """Run a command and return its last output line (for version probes)."""
+        proc = await asyncio.create_subprocess_shell(
+            cmd,
+            stdout=asyncio.subprocess.PIPE,
+            stderr=asyncio.subprocess.STDOUT,
+        )
+        assert proc.stdout is not None
+        out: list[str] = []
+        async for line in proc.stdout:
+            text = clean_log_line(line.decode(errors="replace").rstrip())
+            if text:
+                out.append(text)
+        await proc.wait()
+        return out[-1] if out else ""
+
     async def _step(self, key: str) -> bool:
         tools = self.data["tools"]
         if key == "requirements":
@@ -693,13 +709,35 @@ class LiveInstaller:
                 return True
             venv = Path.home() / "browser-venv"
             py = venv / "bin" / "python"
+            # Match the Playwright version Hermes already installed so its
+            # browser cache (~/.cache/ms-playwright) is reused - no second
+            # Chrome download. Browsers are installed as the agent user (not
+            # via sudo) so the cache lands in the right $HOME.
+            pw_ver = ""
+            hermes_py = HERMES_HOME / "hermes-agent" / "venv" / "bin" / "python"
+            if hermes_py.is_file():
+                pw_ver = (
+                    await self._sh_out(
+                        f"{shlex.quote(str(hermes_py))} -c "
+                        "'import importlib.metadata; "
+                        "print(importlib.metadata.version(\"playwright\"))'"
+                    )
+                ).strip()
+            pw_spec = f"playwright=={pw_ver}" if pw_ver else "playwright"
             ok = await self._sh(
-                f"python3 -m venv {venv} && {py} -m pip install -q playwright mitmproxy"
+                f"python3 -m venv {venv} && "
+                f"{py} -m pip install -q mitmproxy {pw_spec}"
             )
             if ok:
-                self.on_log("installing Chromium + system deps (large download)...")
+                self.on_log(
+                    "installing Chromium system deps (root) + browsers (agent user)..."
+                )
                 ok = await self._sh(
-                    f"sudo {py} -m playwright install --with-deps chromium"
+                    f"sudo {py} -m playwright install-deps chromium"
+                )
+            if ok:
+                ok = await self._sh(
+                    f"{py} -m playwright install chromium"
                 )
             if ok:
                 script = HERMES_HOME / "toolkit" / "tools" / "browser-capture.py"
