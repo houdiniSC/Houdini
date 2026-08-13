@@ -282,10 +282,22 @@ fi
 /home/hermes/hermes-venv/bin/pip install -q textual cryptography
 loginctl enable-linger hermes 2>/dev/null || true
 '@
-    wsl -d $Distro -u root -- bash -c $setup
-    if ($LASTEXITCODE -ne 0) {
-        Fail "Inside-distro setup failed."
+    # wsl.exe mangles multi-line / quoted arguments passed to `bash -c`
+    # (newlines and quotes get split), so run the setup from a file on the
+    # Windows side, visible inside the distro via /mnt/<drive>.
+    $setupFile = Join-Path $InstallerDir "inside-setup.sh"
+    $setupLf = $setup -replace "`r`n", "`n"
+    [System.IO.File]::WriteAllText(
+        $setupFile, $setupLf, (New-Object System.Text.UTF8Encoding($false)))
+    $setupDrive = $setupFile.Substring(0, 1).ToLowerInvariant()
+    $setupRest = $setupFile.Substring(2).Replace("\", "/")
+    $wslSetup = "/mnt/$setupDrive$setupRest"
+    wsl -d $Distro -u root -- bash $wslSetup
+    $setupExit = $LASTEXITCODE
+    if ($setupExit -ne 0) {
+        Fail "Inside-distro setup failed (script kept at $setupFile)."
     }
+    Remove-Item -LiteralPath $setupFile -Force
 
     # restart distro so systemd + default user take effect
     wsl --terminate $Distro 2>$null
