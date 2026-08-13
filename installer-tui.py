@@ -805,6 +805,7 @@ class WizardScreen(Screen):
             dry_run=bool(self.app.dry_run),
             on_log=lambda line: log.write(self._colorize(line)),
             on_progress=lambda: prog.advance(1),
+            log_file=HERMES_HOME / "install.log",
         )
         await installer.run()
         self.app.data["failed"] = installer.failed
@@ -858,6 +859,7 @@ class WizardScreen(Screen):
             log.write(f"[{RED}]Failed steps:[/] {', '.join(data['failed'])}")
         log.write("")
         log.write(f"[{SLATE}]Houdini home:[/] {HERMES_HOME}")
+        log.write(f"[{SLATE}]Install log:[/] {HERMES_HOME / 'install.log'}")
         log.write(
             f"[{SLATE_DIM}]Add more keys/tools anytime: drop a file in toolkit/keys/ or run toolkit-scan.sh.[/]"
         )

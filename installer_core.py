@@ -12,6 +12,7 @@ import base64
 import getpass
 import json
 import os
+import re
 import shlex
 import shutil
 from pathlib import Path
@@ -461,6 +462,22 @@ def provision_keys(secrets: dict, on_log: Callable[[str], None] | None = None) -
 
 
 # ── Live installer engine ─────────────────────────────────────────────────
+_ANSI_RE = re.compile(
+    r"\x1b\[[0-9;?]*[ -/]*[@-~]"          # CSI (colors, cursor, erase)
+    r"|\x1b\][^\x07]*(?:\x07|\x1b\\)"     # OSC (window titles)
+    r"|\x1b[()][0-9A-Z]"                  # charset select
+    r"|\x1b[@-Z\\-^_]"                    # single-char escapes
+)
+
+
+def clean_log_line(raw: str) -> str:
+    """Strip ANSI escapes and collapse \\r progress updates to the last frame."""
+    text = _ANSI_RE.sub("", raw)
+    if "\r" in text:
+        text = text.split("\r")[-1]
+    return text.strip()
+
+
 class LiveInstaller:
     """Runs the real installation steps.
 
@@ -475,15 +492,39 @@ class LiveInstaller:
         sudo_password: str | None = None,
         on_log: Callable[[str], None] | None = None,
         on_progress: Callable[[], None] | None = None,
+        log_file: str | Path | None = None,
     ) -> None:
         self.data = data
         self.dry_run = dry_run
         self.sudo_password = sudo_password
         self.failed: list[str] = []
-        self.on_log = on_log or (lambda _line: None)
+        base_log = on_log or (lambda _line: None)
+        self.log_file = Path(log_file).expanduser() if log_file else None
+        if self.log_file is not None:
+
+            def _log(line: str) -> None:
+                base_log(line)
+                if self.log_file is not None:
+                    try:
+                        with self.log_file.open("a", encoding="utf-8") as fh:
+                            fh.write(line.rstrip("\n") + "\n")
+                    except OSError:
+                        pass
+
+            self.on_log = _log
+        else:
+            self.on_log = base_log
         self.on_progress = on_progress or (lambda: None)
 
     async def run(self) -> None:
+        if self.log_file is not None:
+            try:
+                self.log_file.parent.mkdir(parents=True, exist_ok=True)
+                self.log_file.write_text("", encoding="utf-8")
+            except OSError:
+                self.log_file = None
+            if self.log_file is not None:
+                self.on_log("=== Houdini install started ===")
         steps = [
             ("requirements", "Checking requirements"),
             ("hermes", "Installing Hermes core"),
@@ -514,6 +555,11 @@ class LiveInstaller:
                 self.failed.append(label)
                 self.on_log(f"✗ {label} failed")
             self.on_progress()
+        self.on_log(
+            f"=== install finished | failed: "
+            f"{', '.join(self.failed) if self.failed else 'none'} | "
+            f"log: {self.log_file} ==="
+        )
 
     async def _sh(self, cmd: str, env: dict | None = None) -> bool:
         full_env = dict(os.environ)
@@ -536,7 +582,7 @@ class LiveInstaller:
             proc.stdin.close()
         assert proc.stdout is not None
         async for line in proc.stdout:
-            text = line.decode(errors="replace").rstrip()
+            text = clean_log_line(line.decode(errors="replace").rstrip())
             if text:
                 self.on_log(text)
         return (await proc.wait()) == 0
