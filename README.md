@@ -80,9 +80,9 @@ field names as the wizard's encrypted `.hcfg` config.
 
 Never commit `install-config.json`, `secrets.env`, `*.hcfg`, or the rootfs
 to this repository. Encrypted configs are created locally with
-`config-tool/encrypt-config.ps1` (pure PowerShell - no WSL needed) and
-transferred separately:
+`src/config-tool/encrypt-config.py` (cross-platform Python) and transferred
+separately:
 
-```powershell
-.\config-tool\encrypt-config.ps1 C:\path\install-config.json
+```bash
+python3 src/config-tool/encrypt-config.py C:\path\install-config.json
 ```
