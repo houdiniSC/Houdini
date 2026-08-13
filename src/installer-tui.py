@@ -236,6 +236,7 @@ class WizardScreen(Screen):
                             password=True,
                             id="bot",
                         )
+                        yield Static("", id="core_status")
                     with Vertical(id="step-decide", classes="step"):
                         yield Static(
                             "All tools install by default with the full toolkit.\n"
@@ -487,6 +488,21 @@ class WizardScreen(Screen):
                 return
             await self._show("core")
         elif self.current == "core":
+            if self._selected_provider() == "custom":
+                missing = []
+                if not self.query_one("#model_base_url", Input).value.strip():
+                    missing.append("Base URL")
+                if not self.query_one("#api_key", Input).value.strip():
+                    missing.append("API key")
+                if not self.query_one("#model", Input).value.strip():
+                    missing.append("Model ID")
+                if missing:
+                    self.query_one("#core_status", Static).update(
+                        f"[{RED}]Custom provider: fill {', '.join(missing)} "
+                        "before continuing.[/]"
+                    )
+                    return
+            self.query_one("#core_status", Static).update("")
             self._collect_core()
             await self._show("decide")
         elif self.current == "tools":
@@ -1169,6 +1185,33 @@ async def selftest() -> None:
         assert app4.data["secrets"]["model"] == "tab-model"
         assert app4.data["secrets"]["model_base_url"] == "https://tab-gw.example/v1"
         assert app4.data["secrets"]["api_key"] == "sk-tab-demo"
+
+    # custom validation: Next must be blocked while required fields are empty
+    app5 = HoudiniInstaller(dry_run=True)
+    async with app5.run_test(size=(140, 46)) as pilot5:
+        async def press5(bid: str) -> None:
+            app5.screen.query_one(f"#{bid}", Button).press()
+            await pilot5.pause()
+
+        await pilot5.pause()
+        await press5("next")  # welcome -> config
+        await press5("next")  # config (skip) -> core
+        rs5 = app5.screen.query_one("#model_providers", RadioSet)
+        for rb in rs5.query(RadioButton):
+            if rb.label is not None and rb.label.plain.startswith("Custom"):
+                rb.value = True
+                break
+        await pilot5.pause()
+        app5.screen.query_one("#model_base_url", Input).value = "https://v.example/v1"
+        app5.screen.query_one("#api_key", Input).value = "sk-v"
+        await press5("next")  # model missing -> must NOT advance
+        assert app5.screen.current == "core"
+        status5 = app5.screen.query_one("#core_status", Static)
+        assert "Model ID" in str(status5.content)
+        app5.screen.query_one("#model", Input).value = "v-model"
+        await press5("next")  # now complete -> advances
+        assert app5.screen.current == "decide"
+        assert app5.data["secrets"]["model"] == "v-model"
     print("selftest OK")
 
 

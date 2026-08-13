@@ -375,7 +375,15 @@ def provision_keys(secrets: dict, on_log: Callable[[str], None] | None = None) -
                     f"provider={provider or 'custom'})"
                 )
             else:
-                log("model config incomplete (base_url or model empty) - config.yaml skipped")
+                missing_cfg = [
+                    name
+                    for name, val in (("base_url", base_url), ("model", model_id))
+                    if not val
+                ]
+                log(
+                    f"model config incomplete ({', '.join(missing_cfg)} empty) "
+                    f"- config.yaml skipped"
+                )
     hc = secrets.get("home_channel") or secrets.get("home_user")
     if hc and (HERMES_HOME / "config.yaml").is_file():
         chat, _, thread = hc.partition(":")
@@ -525,6 +533,14 @@ class LiveInstaller:
                 self.log_file = None
             if self.log_file is not None:
                 self.on_log("=== Houdini install started ===")
+        sec = self.data.get("secrets", {})
+        self.on_log(
+            "model config collected: "
+            f"provider={sec.get('model_provider') or '<empty>'}, "
+            f"model={sec.get('model') or '<empty>'}, "
+            f"base_url={sec.get('model_base_url') or '<empty>'}, "
+            f"api_key={'<set>' if sec.get('api_key') else '<empty>'}"
+        )
         steps = [
             ("requirements", "Checking requirements"),
             ("hermes", "Installing Hermes core"),
