@@ -53,6 +53,7 @@ from installer_core import (
     TOOLS,
     LiveInstaller,
     load_install_config,
+    mask,
     model_choices,
     tool_path,
 )
@@ -851,6 +852,10 @@ class WizardScreen(Screen):
             f"{MODEL_PROVIDERS.get(provider, MODEL_PROVIDERS['custom'])['label']} / "
             f"{model or 'not set'}",
         )
+        api_key = data.get("secrets", {}).get("api_key", "")
+        bot = data.get("secrets", {}).get("bot", "")
+        table.add_row("API key", mask(api_key) if api_key else "not set")
+        table.add_row("Bot token", mask(bot) if bot else "not set")
         table.add_row("Sudo mode", mode_label)
         table.add_row("Personality", "set at first conversation (agent name + style)")
         webui = data.get("webui", True)
@@ -921,6 +926,16 @@ class WizardScreen(Screen):
             f"[{SLATE}]AI model:[/] "
             f"{MODEL_PROVIDERS.get(provider, MODEL_PROVIDERS['custom'])['label']} / "
             f"{model or 'not set'}"
+        )
+        api_key = data.get("secrets", {}).get("api_key", "")
+        bot = data.get("secrets", {}).get("bot", "")
+        log.write(
+            f"[{SLATE}]API key:[/] "
+            f"[{EMERALD}]{mask(api_key)}[/]" if api_key else f"[{RED}]API key: not set[/]"
+        )
+        log.write(
+            f"[{SLATE}]Bot token:[/] "
+            f"[{EMERALD}]{mask(bot)}[/]" if bot else f"[{RED}]Bot token: not set[/]"
         )
         log.write(f"[{SLATE}]Personality:[/] asked at first conversation (name + style)")
         log.write(
@@ -1099,6 +1114,7 @@ async def selftest() -> None:
             assert app.data["memory"] is True
             await press("next")  # memory -> review
             assert app.screen.query_one("#review_table", DataTable) is not None
+            assert mask(app.data["secrets"]["api_key"]) == "sk-d...alue"
             await press("next")  # review -> install
             await press("next")  # start install (dry-run)
             for _ in range(60):
