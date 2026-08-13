@@ -11,7 +11,7 @@ web applications, websites, and mobile APKs.
 $src = 'https://raw.githubusercontent.com/houdiniSC/Houdini/main'; irm "$src/bootstrap-wsl.ps1" | iex
 ```
 
-Creates an isolated WSL distro (`HermesGateway`) running the Houdini agent
+Creates an isolated WSL distro (`HoudiniGateway`) running the Houdini agent
 (Hermes engine + full toolchain) and launches the terminal wizard. Provide
 the rootfs locally to skip the download:
 

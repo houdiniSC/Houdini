@@ -1,5 +1,5 @@
 <#
-bootstrap-wsl.ps1 -- create an isolated WSL distro (HermesGateway) and
+bootstrap-wsl.ps1 -- create an isolated WSL distro (HoudiniGateway) and
 run the Houdini terminal installer (TUI) inside it.
 
 Isolation model: the gateway runs inside its OWN WSL distribution
@@ -20,14 +20,14 @@ WORKS BOTH WAYS:
      irm "$src/bootstrap-wsl.ps1" | iex
 
      # optional overrides (caller variables, before the pipe):
-     $Distro = 'HermesGateway'; irm "$pwd\bootstrap-wsl.ps1" | iex
+     $Distro = 'HoudiniGateway'; irm "$pwd\bootstrap-wsl.ps1" | iex
 
   2) Classic script run
-     .\bootstrap-wsl.ps1 -Distro HermesGateway -RootfsPath C:\tmp\ubuntu.tar.gz
+     .\bootstrap-wsl.ps1 -Distro HoudiniGateway -RootfsPath C:\tmp\ubuntu.tar.gz
 
 Configuration precedence: CLI args (script run) > caller variables > env > defaults.
 Caller variables: $src, $Distro, $RootfsPath
-Env vars:         HERMES_SRC, HERMES_DISTRO, HERMES_ROOTFS
+Env vars:         HERMES_SRC, HOUDINI_DISTRO (HERMES_DISTRO fallback), HERMES_ROOTFS
 
 For URL sources the script fetches the package (package.zip preferred, otherwise
 the flat file list + knowledge-pack.zip) into a temp dir before bootstrapping.
@@ -164,8 +164,9 @@ irm `"`$src\bootstrap-wsl.ps1`" | iex"
     }
 
     # ---- 1) Options: caller vars > env > defaults -------------------------
+    if (-not $Distro)     { $Distro = $env:HOUDINI_DISTRO }
     if (-not $Distro)     { $Distro = $env:HERMES_DISTRO }
-    if (-not $Distro)     { $Distro = "HermesGateway" }
+    if (-not $Distro)     { $Distro = "HoudiniGateway" }
     if (-not $RootfsPath) { $RootfsPath = $env:HERMES_ROOTFS }
 
     # ---- 2) Prerequisites ------------------------------------------------
@@ -296,7 +297,7 @@ loginctl enable-linger hermes 2>/dev/null || true
     $installerPath = "/mnt/$drive$rest"
     $py = "/home/hermes/hermes-venv/bin/python"
 
-    Log "Starting the Hermes terminal installer inside '$Distro'..."
+    Log "Starting the Houdini terminal installer inside '$Distro'..."
     Log "Run the wizard directly in this terminal (Textual TUI)."
     wsl -d $Distro -u hermes -- bash -lc "$py '$installerPath/installer-tui.py'"
 }
