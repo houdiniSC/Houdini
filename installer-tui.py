@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """
-installer-tui.py - Hermes Bootstrap Installer (Textual TUI)
+installer-tui.py - Houdini Gateway Installer (Textual TUI)
 
 Professional terminal wizard: dark neural theme, step sidebar, ContentSwitcher
 steps, category switchers for tools/secrets, encrypted-config loading (local
@@ -95,7 +95,7 @@ STEP_DEFS = [
 ]
 
 STEP_HINTS = {
-    "welcome": "Press Start to configure the isolated Hermes gateway.",
+    "welcome": "Press Start to configure the isolated Houdini gateway.",
     "config": "Optional: paste a local path or an http(s) URL, then Load & Apply.",
     "core": "Required: pick an AI provider, choose the model and enter its API key. Bot token starts the gateway. Everything else can be added later.",
     "decide": "All tools install by default. Continue to customize, or Quick Install with defaults.",
@@ -120,7 +120,7 @@ class WizardScreen(Screen):
         yield Header(show_clock=True)
         with Horizontal(id="root"):
             with Vertical(id="sidebar"):
-                yield Static("HERMES", id="logo")
+                yield Static("HOUDINI", id="logo")
                 yield Static("BOOTSTRAP INSTALLER", id="subtitle")
                 yield Static("", id="side_gradient")
                 yield Static("", id="step_list")
@@ -131,7 +131,7 @@ class WizardScreen(Screen):
                 with ContentSwitcher(id="steps"):
                     with Vertical(id="step-welcome", classes="step"):
                         yield Static("", id="welcome_gradient")
-                        yield Static("HERMES", id="content_logo")
+                        yield Static("HOUDINI", id="content_logo")
                         yield Static("LIVE console wizard - Ubuntu installer style", id="content_sub")
                         yield Static(
                             f"- [{EMERALD}]+[/] Live apt / binary installation\n"
@@ -857,7 +857,7 @@ class WizardScreen(Screen):
         if data.get("failed"):
             log.write(f"[{RED}]Failed steps:[/] {', '.join(data['failed'])}")
         log.write("")
-        log.write(f"[{SLATE}]Hermes home:[/] {HERMES_HOME}")
+        log.write(f"[{SLATE}]Houdini home:[/] {HERMES_HOME}")
         log.write(
             f"[{SLATE_DIM}]Add more keys/tools anytime: drop a file in toolkit/keys/ or run toolkit-scan.sh.[/]"
         )
@@ -866,10 +866,10 @@ class WizardScreen(Screen):
 # --------------------------------------------------------------------------
 # App
 # --------------------------------------------------------------------------
-class HermesInstaller(App):
-    """Hermes Bootstrap Installer - Textual UI, live installation."""
+class HoudiniInstaller(App):
+    """Houdini Gateway Installer - Textual UI, live installation."""
 
-    TITLE = "Hermes Bootstrap Installer"
+    TITLE = "Houdini Gateway Installer"
     SUB_TITLE = "terminal wizard"
     BINDINGS = [Binding("q", "quit", "Quit")]
     THEMES = {
@@ -977,7 +977,7 @@ class HermesInstaller(App):
 # Self-test (headless, dry-run)
 # --------------------------------------------------------------------------
 async def selftest() -> None:
-    app = HermesInstaller(dry_run=True)
+    app = HoudiniInstaller(dry_run=True)
     async with app.run_test(size=(140, 46)) as pilot:
         try:
             async def press(bid: str) -> None:
@@ -1039,7 +1039,7 @@ async def selftest() -> None:
             raise
 
     # quick-install path: core -> decide(quick) -> review (defaults, no install)
-    app2 = HermesInstaller(dry_run=True)
+    app2 = HoudiniInstaller(dry_run=True)
     async with app2.run_test(size=(140, 46)) as pilot2:
         async def press2(bid: str) -> None:
             app2.screen.query_one(f"#{bid}", Button).press()
@@ -1062,7 +1062,7 @@ async def selftest() -> None:
 
 if __name__ == "__main__":
     def main() -> None:
-        HermesInstaller().run()
+        HoudiniInstaller().run()
 
     if "--selftest" in sys.argv:
         asyncio.run(selftest())

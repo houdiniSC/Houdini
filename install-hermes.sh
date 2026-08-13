@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# install-hermes.sh — Hermes Bootstrap Installer (whiptail UI)
+# install-hermes.sh — Houdini Gateway Installer (whiptail UI)
 # Target: WSL2 Ubuntu (run as the normal user).
 # Secrets: read from secrets.env if present, else ask via UI (empty = skip).
 # Sudo: agent permissions are configured via sudoers.d — no stored password.
@@ -18,7 +18,7 @@ command -v whiptail >/dev/null 2>&1 && HAVE_UI=1
 
 ui_box() { # ui_box <title> <height> <width> <text>
   if [ "$HAVE_UI" = 1 ]; then
-    whiptail --backtitle "Hermes Bootstrap Installer" --title "$1" --msgbox "$4" "$2" "$3"
+    whiptail --backtitle "Houdini Bootstrap Installer" --title "$1" --msgbox "$4" "$2" "$3"
   else
     printf '\n== %s ==\n%s\n' "$1" "$4"
   fi
@@ -26,7 +26,7 @@ ui_box() { # ui_box <title> <height> <width> <text>
 
 ui_info() { # ui_info <title> <text>
   if [ "$HAVE_UI" = 1 ]; then
-    whiptail --backtitle "Hermes Bootstrap Installer" --title "$1" --infobox "$2" 6 62
+    whiptail --backtitle "Houdini Bootstrap Installer" --title "$1" --infobox "$2" 6 62
   else
     printf '[%s] %s\n' "$1" "$2"
   fi
@@ -35,7 +35,7 @@ ui_info() { # ui_info <title> <text>
 ui_ask() { # ui_ask <title> <prompt> -> prints value (empty = skip)
   local title=$1 prompt=$2 val=""
   if [ "$HAVE_UI" = 1 ]; then
-    val=$(whiptail --backtitle "Hermes Bootstrap Installer" --title "$title" \
+    val=$(whiptail --backtitle "Houdini Bootstrap Installer" --title "$title" \
       --inputbox "$prompt
 
 (اتركه فارغًا ثم Enter للتخطي)" 10 70 3>&1 1>&2 2>&3 || true)
@@ -47,7 +47,7 @@ ui_ask() { # ui_ask <title> <prompt> -> prints value (empty = skip)
 
 ui_yesno() { # ui_yesno <title> <text> -> 0 yes / 1 no (default: yes)
   if [ "$HAVE_UI" = 1 ]; then
-    whiptail --backtitle "Hermes Bootstrap Installer" --title "$1" --yesno "$2" 10 64
+    whiptail --backtitle "Houdini Bootstrap Installer" --title "$1" --yesno "$2" 10 64
   else
     printf '%s (Y/n): ' "$2"; read -r a
     case "$a" in ""|y|Y) return 0;; *) return 1;; esac
@@ -60,7 +60,7 @@ ui_radio() { # ui_radio <title> <prompt> <items...> -> prints selection
   local args=() i=0 choice
   for item in "${items[@]}"; do i=$((i+1)); args+=("$i" "$item" OFF); done
   if [ "$HAVE_UI" = 1 ]; then
-    choice=$(whiptail --backtitle "Hermes Bootstrap Installer" --title "$title" \
+    choice=$(whiptail --backtitle "Houdini Bootstrap Installer" --title "$title" \
       --radiolist "$prompt" 14 50 8 "${args[@]}" 3>&1 1>&2 2>&3 || true)
   else
     printf '%s\n' "$prompt"
@@ -80,7 +80,7 @@ get_env() { grep -E "^$1=" "$SECRETS_FILE" 2>/dev/null | head -1 | cut -d= -f2-;
 # ── Welcome ───────────────────────────────────────────────────────────────
 ui_box "Welcome" 14 68 "
          ╔══════════════════════════════════════════════╗
-         ║   HERMES BOOTSTRAP INSTALLER                 ║
+         ║   HOUDINI BOOTSTRAP INSTALLER                ║
          ╚══════════════════════════════════════════════╝
 
 سيتم تثبيت:

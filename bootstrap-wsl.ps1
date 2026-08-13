@@ -1,6 +1,6 @@
 <#
 bootstrap-wsl.ps1 -- create an isolated WSL distro (HermesGateway) and
-run the Hermes terminal installer (TUI) inside it.
+run the Houdini terminal installer (TUI) inside it.
 
 Isolation model: the gateway runs inside its OWN WSL distribution
 (separate filesystem, home, processes, and services) -- like OpenClawGateway.

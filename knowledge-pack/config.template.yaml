@@ -1,4 +1,4 @@
-# Hermes configuration template
+# Houdini gateway configuration template (Hermes engine)
 # The installer copies it to ~/.hermes/config.yaml and replaces the
 # __MODEL_ID__ / __MODEL_BASE_URL__ / __API_KEY__ placeholders with the
 # values chosen during installation (any OpenAI-compatible provider).

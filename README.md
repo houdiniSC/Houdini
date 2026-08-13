@@ -1,7 +1,9 @@
-# Hermes Bootstrap
+# Houdini Gateway
 
-Production installer for an isolated Hermes gateway (WSL2 Ubuntu) with a
-full security toolchain and knowledge pack.
+Production installer for the **Houdini** security gateway — an isolated
+WSL2 workspace (Hermes engine) with a full security toolchain and
+knowledge pack. Houdini is your offensive security assistant for testing
+web applications, websites, and mobile APKs.
 
 ## One-liner (PowerShell)
 
@@ -9,9 +11,9 @@ full security toolchain and knowledge pack.
 $src = 'https://raw.githubusercontent.com/houdiniSC/Houdini/main'; irm "$src/bootstrap-wsl.ps1" | iex
 ```
 
-Creates an isolated WSL distro (`HermesGateway`), installs Hermes + tools,
-and launches the terminal wizard. Provide the rootfs locally to skip the
-download:
+Creates an isolated WSL distro (`HermesGateway`) running the Houdini agent
+(Hermes engine + full toolchain) and launches the terminal wizard. Provide
+the rootfs locally to skip the download:
 
 ```powershell
 $src = 'https://raw.githubusercontent.com/houdiniSC/Houdini/main'; $RootfsPath = 'C:\path\to\ubuntu-rootfs.tar.gz'; irm "$src/bootstrap-wsl.ps1" | iex
