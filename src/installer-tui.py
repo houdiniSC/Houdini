@@ -23,7 +23,6 @@ from textual.binding import Binding
 from textual.containers import Horizontal, Vertical
 from textual.renderables.gradient import LinearGradient
 from textual.screen import Screen
-from textual.theme import Theme
 from textual.widgets import (
     Button,
     Checkbox,
@@ -907,23 +906,9 @@ class HoudiniInstaller(App):
     TITLE = "Houdini Gateway Installer"
     SUB_TITLE = "terminal wizard"
     BINDINGS = [Binding("q", "quit", "Quit")]
-    THEMES = {
-        "gruvbox": Theme(
-            name="gruvbox",
-            primary=BLUE,
-            secondary=VIOLET,
-            accent=CYAN,
-            success=EMERALD,
-            warning=ORANGE,
-            error=RED,
-            foreground="#EBDBB2",
-            background="#282828",
-            surface="#1D2021",
-            panel="#3C3836",
-            boost="#504945",
-            dark=True,
-        )
-    }
+    # Built-in Textual themes (gruvbox, nord, dracula, catppuccin-mocha,
+    # tokyo-night, monokai, solarized-dark, rose-pine, ...) - switch by
+    # changing this one line.
     THEME = "gruvbox"
 
     CSS = """
