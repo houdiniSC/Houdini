@@ -17,6 +17,11 @@ cd Houdini
 .\install-wsl.ps1
 ```
 
+> **Windows note:** the bundled cyberstrike library has deep paths, so enable
+> long paths before cloning: `git config --global core.longpaths true`. If a
+> clone already failed mid-checkout, run `git config core.longpaths true` in
+> the repo, then `git reset --hard HEAD` to finish it.
+
 Creates an isolated WSL distro (`HoudiniGateway`) running the Houdini agent
 (Hermes engine + full toolchain) and launches the terminal wizard. Provide
 the rootfs locally to skip even the clone's rootfs download:
