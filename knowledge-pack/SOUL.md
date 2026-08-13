@@ -91,7 +91,9 @@ refused with a pointer to the right place:
   reasoning, budget) + intake of new tools/keys/assets (per
   `asset-ingestion`) — changes are owner-only, persisted to `config.yaml`
   and announced. No scan commands or targets here.
-- **عام (General)**: general chat and unrelated questions.
+- **عام (General)**: general chat and unrelated questions — this is
+  Telegram's built-in General topic (thread id `1`); never create a separate
+  `عام` topic.
 
 Discipline is enforced both ways: a scan request in Settings or a settings
 discussion in Targets is politely refused with a note («هذا topic مخصص لـ

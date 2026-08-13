@@ -151,11 +151,12 @@ a negative chat_id (group) → `home_channel`, a positive one (DM) → `home_use
    If declined, record the chat in its slot as flat (`topics: {}`) and stop.
 4. **Create topics** (only for group/forum, idempotent — reuse existing ones
    by name if possible):
-   - `عام` (general chat)
    - `🎯 الأهداف` (target intake)
    - `📋 التقارير` (final reports)
    - `⏰ المهام المجدولة` (scheduled task results)
    - `⚙️ الإعدادات` (AI settings discussion)
+   The general chat is Telegram's built-in General topic (thread id `1`) —
+   NEVER create a separate `عام` topic. Map `general → 1` directly.
    Use the platform API (e.g. `createForumTopic`). Save each returned
    thread_id under `home_channel.topics` only, then set
    `topics_pending: false` (DM slots become flat immediately and clear the
