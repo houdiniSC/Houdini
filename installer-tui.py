@@ -176,6 +176,10 @@ class WizardScreen(Screen):
                             *[p["label"] for p in MODEL_PROVIDERS.values()],
                             id="model_providers",
                         )
+                        yield Input(
+                            placeholder="Base URL (auto-filled for presets; required for Custom)",
+                            id="model_base_url",
+                        )
                         yield Select(
                             [],
                             prompt="Model list (live - click to pick)",
@@ -191,10 +195,6 @@ class WizardScreen(Screen):
                             placeholder="API key (sk-...)",
                             password=True,
                             id="api_key",
-                        )
-                        yield Input(
-                            placeholder="Base URL (auto-filled for presets)",
-                            id="model_base_url",
                         )
                         yield Input(
                             placeholder="Telegram bot token (@BotFather)",
@@ -316,7 +316,7 @@ class WizardScreen(Screen):
         self.current = "welcome"
         self.config_loaded = False
         self.install_done = False
-        self._key_timer = None
+        self._refresh_timer = None
 
         self.query_one("#tool_cats", OptionList).add_options(
             [TOOL_CAT_LABELS.get(c, c) for c in TOOL_CATS]
@@ -735,13 +735,13 @@ class WizardScreen(Screen):
         model_input.value = str(value)
 
     def on_input_changed(self, event: Input.Changed) -> None:
-        if event.input.id == "api_key":
-            if self._key_timer is not None:
-                self._key_timer.stop()
-            self._key_timer = None
+        if event.input.id in ("api_key", "model_base_url"):
+            if self._refresh_timer is not None:
+                self._refresh_timer.stop()
+            self._refresh_timer = None
             if self.app.dry_run or not event.value.strip():
                 return
-            self._key_timer = self.set_timer(
+            self._refresh_timer = self.set_timer(
                 0.8,
                 lambda: self.run_worker(
                     self._refresh_model_list(self._selected_provider())
