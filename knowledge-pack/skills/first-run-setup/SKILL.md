@@ -147,7 +147,8 @@ a negative chat_id (group) → `home_channel`, a positive one (DM) → `home_use
    are created when a target is accepted — SCOPE.md, evidence/, poc/,
    reports/, logs/ — see SOUL.md "هيكل العمل").
 7. **Verify environment assets** (read-only — do NOT write memory): confirm
-   `~/vpn-profiles/*.ovpn` + `~/vpn-profiles/auth.txt` exist and
+   `~/vpn-profiles/*.ovpn` exist, the key registry holds
+   `vpn_user.key` / `vpn_pass.key`, and
    `~/.hermes/toolkit/inventory.yaml` lists them (`vpn_profiles.count`),
    refreshing with `bash ~/.hermes/toolkit/toolkit-scan.sh` if stale.
    Check `~/.hermes/toolkit/assets/manifest.json` too and restore missing
