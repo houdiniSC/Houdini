@@ -1,0 +1,17 @@
+# cyberstrike — 7561 skills
+# Load a SKILL.md only when its description/tags match the task.
+attack-methodologies:
+  description: "Imported skill library — browse its index on demand"
+  nested: true  # contains sub-skills; list the folder on demand
+compliance:
+  description: "Imported skill library — browse its index on demand"
+  nested: true  # contains sub-skills; list the folder on demand
+domain-knowledge:
+  description: "Imported skill library — browse its index on demand"
+  nested: true  # contains sub-skills; list the folder on demand
+mobile:
+  description: "Imported skill library — browse its index on demand"
+  nested: true  # contains sub-skills; list the folder on demand
+post-exploitation:
+  description: "Imported skill library — browse its index on demand"
+  nested: true  # contains sub-skills; list the folder on demand

@@ -1,0 +1,17 @@
+# secrets & configs — never commit
+install-config.json
+install-config.hcfg
+secrets.env
+*.hcfg
+secrets.env.*
+
+# large / dev artifacts
+rootfs/
+_archive/
+work/
+.shots/
+
+# python
+__pycache__/
+*.pyc
+.venv/

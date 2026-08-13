@@ -1,0 +1,74 @@
+# Hermes configuration template
+# The installer copies it to ~/.hermes/config.yaml and replaces
+# __DEEPSEEK_API_KEY__ with the key provided during installation.
+
+model:
+  default: deepseek-v4-flash
+  provider: custom
+  base_url: https://api.deepseek.com/v1
+  api_key: __DEEPSEEK_API_KEY__
+
+database:
+  journal_mode: wal
+
+agent:
+  max_turns: 500
+  verbose: false
+  reasoning_effort: medium
+
+terminal:
+  backend: local
+  cwd: .
+  timeout: 180
+  home_mode: auto
+
+compression:
+  enabled: true
+  progress_notices: false
+  threshold: 0.5
+  target_ratio: 0.2
+  protect_last_n: 20
+  protect_first_n: 3
+  max_attempts: 3
+
+prompt_caching:
+  cache_ttl: 5m
+
+memory:
+  memory_enabled: true
+  user_profile_enabled: true
+  provider: holographic
+  memory_char_limit: 2200
+  user_char_limit: 1375
+  nudge_interval: 10
+  flush_min_turns: 6
+
+delegation:
+  max_iterations: 50
+
+skills:
+  creation_nudge_interval: 15
+
+platforms:
+  telegram:
+    enabled: true
+    home_channel:
+      platform: telegram
+      chat_id: ""          # auto-configured on first run (skills/first-run-setup)
+      thread_id: ""
+      name: ""
+      user_id: ""
+
+plugins:
+  hermes-memory-store:
+    # Local SQLite fact store (Holographic provider) - no server, no API keys,
+    # no model downloads. Facts are saved on demand via fact_store and mirrored
+    # from built-in memory writes; auto_extract stays off to keep memory lean.
+    auto_extract: false
+    default_trust: 0.5
+    min_trust_threshold: 0.3
+    temporal_decay_half_life: 0
+    hrr_dim: 1024
+
+# Security: secret redaction is ON by default — strings that look like API keys,
+# tokens, and passwords are masked in tool output, logs, and chat responses.

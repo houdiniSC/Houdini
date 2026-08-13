@@ -1,0 +1,34 @@
+# Example of the generated catalog — run toolkit-scan.sh to produce the real one.
+# All values here are synthetic placeholders.
+
+generated_at: "2026-01-01T00:00:00+00:00"
+
+tools:
+  nuclei:
+    path: "/usr/local/bin/nuclei"
+    version: "v3.x"
+  subfinder:
+    path: "/usr/local/bin/subfinder"
+    version: "v2.x"
+  nuclei_templates:
+    path: "/home/<user>/nuclei-templates"
+    templates: "12000"
+
+keys:
+  vulners:
+    path: "/home/<user>/.config/vulners/api.key"
+    status: present
+    masked: "abcd...wxyz"
+  wpscan:
+    status: missing
+
+extra_keys:
+  - file: "/home/<user>/.hermes/toolkit/keys/brave.key"
+    masked: "BSab...Wxyz"
+
+vpn_profiles:
+  count: "0"
+
+notes: |
+  Run this script after installing a tool or adding a key.
+  The agent reads this file first whenever it needs tools or keys.
