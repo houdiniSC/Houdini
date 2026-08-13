@@ -1,5 +1,5 @@
 <#
-bootstrap-wsl.ps1 -- create an isolated WSL distro (HoudiniGateway) and
+install-wsl.ps1 -- create an isolated WSL distro (HoudiniGateway) and
 run the Houdini terminal installer (TUI) inside it.
 
 Isolation model: the gateway runs inside its OWN WSL distribution
@@ -9,30 +9,31 @@ WORKS BOTH WAYS:
 
   1) One-liner via irm | iex (local path or URL) -- recommended
      Note: irm needs an ABSOLUTE path or file:// URI (relative paths are rejected).
-     $src = 'C:\path\to\hermes-bootstrap'      # local folder
-     irm "$src\bootstrap-wsl.ps1" | iex
+     $src = 'C:\path\to\Houdini'               # local package root
+     irm "$src\src\install-wsl.ps1" | iex
 
-     # or from inside the package folder (no $src needed):
-     cd C:\path\to\hermes-bootstrap
-     irm "$pwd\bootstrap-wsl.ps1" | iex
+     # or from inside the package root (no $src needed):
+     cd C:\path\to\Houdini
+     irm "$pwd\src\install-wsl.ps1" | iex
 
      $src = 'https://host/path'                # hosted package
-     irm "$src/bootstrap-wsl.ps1" | iex
+     irm "$src/src/install-wsl.ps1" | iex
 
      # optional overrides (caller variables, before the pipe):
-     $Distro = 'HoudiniGateway'; irm "$pwd\bootstrap-wsl.ps1" | iex
+     $Distro = 'HoudiniGateway'; irm "$pwd\src\install-wsl.ps1" | iex
 
   2) Classic script run
-     .\bootstrap-wsl.ps1 -Distro HoudiniGateway -RootfsPath C:\tmp\ubuntu.tar.gz
+     .\src\install-wsl.ps1 -Distro HoudiniGateway -RootfsPath C:\tmp\ubuntu.tar.gz
 
 Configuration precedence: CLI args (script run) > caller variables > env > defaults.
 Caller variables: $src, $Distro, $RootfsPath
 Env vars:         HERMES_SRC, HOUDINI_DISTRO (HERMES_DISTRO fallback), HERMES_ROOTFS
 
-For URL sources the script fetches the package (package.zip preferred, otherwise
-the flat file list + knowledge-pack.zip) into a temp dir before bootstrapping.
-Rootfs source (default): Ubuntu 24.04 WSL rootfs from cdimages.ubuntu.com
-(WSL images moved there from cloud-images.ubuntu.com; the old path 404s).
+For URL sources the script fetches the full repo zip (codeload) into a temp
+dir; the package root is the extracted repo root (src/, knowledge-pack/,
+rootfs/). Rootfs source (default): bundled rootfs chunks when present,
+otherwise Ubuntu 24.04 WSL rootfs from cdimages.ubuntu.com (WSL images moved
+there from cloud-images.ubuntu.com; the old path 404s).
 #>
 
 $ErrorActionPreference = "Stop"
@@ -58,9 +59,16 @@ for ($i = 0; $i -lt $args.Count; $i++) {
     }
 
     # ---- 0) Resolve package location (dir or URL) ------------------------
-    # Order: -Source / $PSScriptRoot / invocation path / caller $src / HERMES_SRC
-    # When piped via irm | iex the script has no path, so fall back to a
-    # bounded search: cwd -> its subfolders -> ancestors (up to 5 levels).
+    # The package root contains src/installer-tui.py + knowledge-pack/ (and
+    # rootfs/ for the bundled distro image). All code lives under src/.
+    function Test-PackageRoot {
+        param([string]$Candidate)
+        return (
+            (Test-Path (Join-Path $Candidate "src\installer-tui.py")) -and
+            (Test-Path (Join-Path $Candidate "knowledge-pack"))
+        )
+    }
+
     function Find-PackageDir {
         param([string]$Start)
         $dir = if ($Start) { $Start } else { (Get-Location).Path }
@@ -69,7 +77,7 @@ for ($i = 0; $i -lt $args.Count; $i++) {
             $candidates += @(Get-ChildItem -Directory -LiteralPath $dir -ErrorAction SilentlyContinue |
                 Sort-Object Name | ForEach-Object { $_.FullName })
             foreach ($candidate in $candidates) {
-                if (Test-Path (Join-Path $candidate "installer-tui.py")) {
+                if (Test-PackageRoot $candidate) {
                     return $candidate
                 }
             }
@@ -88,10 +96,16 @@ for ($i = 0; $i -lt $args.Count; $i++) {
     if (-not $Here) { $Here = $src }
     if (-not $Here) { $Here = $env:HERMES_SRC }
     if (-not $Here) { $Here = Find-PackageDir }
+    # If the caller pointed at the src/ folder itself, normalize to the root.
+    if ($Here -and -not ($Here -match '^https?://') -and
+        (Test-Path (Join-Path $Here "installer-tui.py")) -and
+        (Test-Path (Join-Path $Here "..\knowledge-pack"))) {
+        $Here = Split-Path -Parent $Here
+    }
     if (-not $Here) {
         Fail "Could not locate the package. Set `$src before piping, e.g.:
-`$src = 'C:\path\to\hermes-bootstrap'
-irm `"`$src\bootstrap-wsl.ps1`" | iex"
+`$src = 'C:\path\to\Houdini'
+irm `"`$src\src\install-wsl.ps1`" | iex"
     }
 
     $Remote = $Here -match '^https?://'
@@ -99,12 +113,12 @@ irm `"`$src\bootstrap-wsl.ps1`" | iex"
 
     if ($Remote) {
         $base = $Here.TrimEnd('/')
-        $InstallerDir = Join-Path $env:TEMP ("hermes-bootstrap-" + [guid]::NewGuid().ToString("N"))
+        $InstallerDir = Join-Path $env:TEMP ("houdini-package-" + [guid]::NewGuid().ToString("N"))
         New-Item -ItemType Directory -Path $InstallerDir | Out-Null
         Log "Fetching package from $base -> $InstallerDir"
 
         $fetched = $false
-        # GitHub raw base -> full repo zip (ships knowledge-pack/ automatically)
+        # GitHub raw base -> full repo zip (ships src/, knowledge-pack/, rootfs/)
         $ghMatch = [regex]::Match($base, '^https://raw\.githubusercontent\.com/([^/]+)/([^/]+)/')
         if ($ghMatch.Success) {
             $repoZip = Join-Path $InstallerDir "repo.zip"
@@ -115,9 +129,8 @@ irm `"`$src\bootstrap-wsl.ps1`" | iex"
                 $exDir = Join-Path $InstallerDir "repo-extract"
                 Expand-Archive -Path $repoZip -DestinationPath $exDir -Force
                 $sub = Get-ChildItem $exDir -Directory | Where-Object { $_.Name -ne "__MACOSX" } | Select-Object -First 1
-                if ($sub -and (Test-Path (Join-Path $sub.FullName "installer-tui.py"))) {
-                    Get-ChildItem -LiteralPath $sub.FullName -Force |
-                        Copy-Item -Destination $InstallerDir -Recurse -Force
+                if ($sub -and (Test-PackageRoot $sub.FullName)) {
+                    $InstallerDir = $sub.FullName
                     $fetched = $true
                 }
             } catch {
@@ -126,35 +139,22 @@ irm `"`$src\bootstrap-wsl.ps1`" | iex"
         }
 
         if (-not $fetched) {
-            $zip = Join-Path $InstallerDir "package.zip"
-            try { Invoke-WebRequest -UseBasicParsing -Uri "$base/package.zip" -OutFile $zip -TimeoutSec 60 } catch { }
-            $zipOk = $false
-            if (Test-Path $zip) { try { $zipOk = (Get-Item $zip).Length -gt 0 } catch { $zipOk = $false } }
-            if ($zipOk) {
-                Expand-Archive -Path $zip -DestinationPath $InstallerDir -Force
-                $sub = Get-ChildItem $InstallerDir -Directory | Where-Object { $_.Name -ne "__MACOSX" } | Select-Object -First 1
-                if ($sub -and (Get-ChildItem $InstallerDir -File).Count -eq 0) {
-                    $InstallerDir = $sub.FullName
-                }
-                $fetched = Test-Path (Join-Path $InstallerDir "installer-tui.py")
-            } else {
-                foreach ($f in @("installer-tui.py", "installer_core.py",
-                                 "install-hermes.sh", "export-config.py", "keys-manager.py",
-                                 "secrets.env.example")) {
-                    try {
-                        Invoke-WebRequest -UseBasicParsing -Uri "$base/$f" -OutFile (Join-Path $InstallerDir $f) -TimeoutSec 60
-                    } catch { }
-                }
-                $kpZip = Join-Path $InstallerDir "knowledge-pack.zip"
-                try { Invoke-WebRequest -UseBasicParsing -Uri "$base/knowledge-pack.zip" -OutFile $kpZip -TimeoutSec 60 } catch { }
-                $kpOk = $false
-                if (Test-Path $kpZip) { try { $kpOk = (Get-Item $kpZip).Length -gt 0 } catch { $kpOk = $false } }
-                if ($kpOk) {
-                    Expand-Archive -Path $kpZip -DestinationPath (Join-Path $InstallerDir "knowledge-pack") -Force
-                    Remove-Item -LiteralPath $kpZip -Force
-                }
-                $fetched = Test-Path (Join-Path $InstallerDir "installer-tui.py")
+            # Flat fallback for non-GitHub hosts: src/ files + knowledge-pack.zip
+            $srcDir = Join-Path $InstallerDir "src"
+            New-Item -ItemType Directory -Path $srcDir | Out-Null
+            foreach ($f in @("install-wsl.ps1", "install-ubuntu.sh", "installer-tui.py",
+                             "installer_core.py", "keys-manager.py", "secrets.env.example")) {
+                try {
+                    Invoke-WebRequest -UseBasicParsing -Uri "$base/src/$f" -OutFile (Join-Path $srcDir $f) -TimeoutSec 60
+                } catch { }
             }
+            $kpZip = Join-Path $InstallerDir "knowledge-pack.zip"
+            try { Invoke-WebRequest -UseBasicParsing -Uri "$base/knowledge-pack.zip" -OutFile $kpZip -TimeoutSec 60 } catch { }
+            if ((Test-Path $kpZip) -and (Get-Item $kpZip).Length -gt 0) {
+                Expand-Archive -Path $kpZip -DestinationPath (Join-Path $InstallerDir "knowledge-pack") -Force
+                Remove-Item -LiteralPath $kpZip -Force
+            }
+            $fetched = Test-PackageRoot $InstallerDir
         }
         if (-not $fetched) {
             Fail "Could not fetch the installer package from $base (installer-tui.py missing)."
@@ -340,7 +340,7 @@ loginctl enable-linger hermes 2>/dev/null || true
     # ---- 4) Launch the terminal installer (TUI) inside the distro --------
     $drive = $InstallerDir.Substring(0, 1).ToLowerInvariant()
     $rest = $InstallerDir.Substring(2).Replace("\", "/")
-    $installerPath = "/mnt/$drive$rest"
+    $installerPath = "/mnt/$drive$rest/src"
     $py = "/home/hermes/hermes-venv/bin/python"
 
     Log "Starting the Houdini terminal installer inside '$Distro'..."

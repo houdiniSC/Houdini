@@ -20,7 +20,7 @@ from typing import Callable
 
 # ── Paths ─────────────────────────────────────────────────────────────────
 SCRIPT_DIR = Path(__file__).resolve().parent
-PACK_DIR = SCRIPT_DIR / "knowledge-pack"
+PACK_DIR = SCRIPT_DIR.parent / "knowledge-pack"
 HERMES_HOME = Path.home() / ".hermes"
 
 # ── Data ──────────────────────────────────────────────────────────────────

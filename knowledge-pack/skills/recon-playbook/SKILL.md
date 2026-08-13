@@ -8,7 +8,7 @@ description: Standard web recon methodology — scoping, passive enumeration, te
 ## 0. Scope & authorization
 - Only proceed when the user explicitly declared the target authorized.
 - Record the declared scope in `~/recon/<target>/SCOPE.md` before scanning.
-- Target folder layout (see SOUL.md "هيكل العمل"): `evidence/`, `poc/`,
+- Target folder layout (see SOUL.md "Work layout"): `evidence/`, `poc/`,
   `reports/`, `logs/` under `~/recon/<target>/` — create them on intake.
 
 ## 1. Passive phase (no contact with the target)

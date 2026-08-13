@@ -1,15 +1,15 @@
 #!/usr/bin/env bash
-# install-hermes.sh — Houdini Gateway Installer (whiptail UI)
+# install-ubuntu.sh — Houdini Gateway Installer (whiptail UI, native Ubuntu)
 # Target: WSL2 Ubuntu (run as the normal user).
 # Secrets: read from secrets.env if present, else ask via UI (empty = skip).
 # Sudo: agent permissions are configured via sudoers.d — no stored password.
 set -uo pipefail
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
-PACK_DIR="$SCRIPT_DIR/knowledge-pack"
+PACK_DIR="$SCRIPT_DIR/../knowledge-pack"
 SECRETS_FILE="$SCRIPT_DIR/secrets.env"
 HERMES_HOME="$HOME/.hermes"
-LOG="/tmp/hermes-bootstrap.log"
+LOG="/tmp/houdini-bootstrap.log"
 : > "$LOG"
 
 # ── UI helpers ────────────────────────────────────────────────────────────

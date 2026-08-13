@@ -14,7 +14,7 @@ download:
 ```powershell
 git clone https://github.com/houdiniSC/Houdini.git
 cd Houdini
-.\bootstrap-wsl.ps1
+.\src\install-wsl.ps1
 ```
 
 Creates an isolated WSL distro (`HoudiniGateway`) running the Houdini agent
@@ -22,21 +22,36 @@ Creates an isolated WSL distro (`HoudiniGateway`) running the Houdini agent
 the rootfs locally to skip even the clone's rootfs download:
 
 ```powershell
-$RootfsPath = 'C:\path\to\ubuntu-rootfs.tar.gz'; .\bootstrap-wsl.ps1
+$RootfsPath = 'C:\path\to\ubuntu-rootfs.tar.gz'; .\src\install-wsl.ps1
 ```
 
 ## One-liner (PowerShell, from GitHub)
 
 ```powershell
-$src = 'https://raw.githubusercontent.com/houdiniSC/Houdini/main'; irm "$src/bootstrap-wsl.ps1" | iex
+$src = 'https://raw.githubusercontent.com/houdiniSC/Houdini/main'; irm "$src/src/install-wsl.ps1" | iex
 ```
 
 The one-liner downloads the repo zip once and reuses the rootfs chunks
 inside it (no extra rootfs download). Or point it at a local rootfs:
 
 ```powershell
-$src = 'https://raw.githubusercontent.com/houdiniSC/Houdini/main'; $RootfsPath = 'C:\path\to\ubuntu-rootfs.tar.gz'; irm "$src/bootstrap-wsl.ps1" | iex
+$src = 'https://raw.githubusercontent.com/houdiniSC/Houdini/main'; $RootfsPath = 'C:\path\to\ubuntu-rootfs.tar.gz'; irm "$src/src/install-wsl.ps1" | iex
 ```
+
+## Native Ubuntu (no WSL)
+
+Clone the repo and run the shell installer (whiptail UI) directly on an
+Ubuntu machine:
+
+```bash
+git clone https://github.com/houdiniSC/Houdini.git
+cd Houdini
+bash src/install-ubuntu.sh
+```
+
+It reads optional settings from `src/secrets.env` (copy
+`src/secrets.env.example`) and writes the install log to
+`/tmp/houdini-bootstrap.log`.
 
 ## Remove the distro
 
@@ -57,9 +72,9 @@ OpenAI-compatible provider - DeepSeek, OpenAI, OpenCode or a custom
 endpoint) and the Telegram bot token. Everything else is optional and
 can be detected or added later at first conversation.
 
-For a fast scripted install, copy `secrets.env.example` to `secrets.env`
-next to `install-hermes.sh` and fill the values — same field names as the
-wizard's encrypted `.hcfg` config.
+For a fast scripted install, copy `src/secrets.env.example` to
+`src/secrets.env` next to `install-ubuntu.sh` and fill the values — same
+field names as the wizard's encrypted `.hcfg` config.
 
 ## Security
 
