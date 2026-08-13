@@ -61,14 +61,22 @@ purpose; in the private/flat chat use the fixed message conventions below.
 Every topic is strictly scoped — any out-of-purpose request is politely
 refused with a pointer to the right place:
 
-- **🎯 الأهداف (Targets)**: intake only (links, emails, APK files). For
-  each target create a standalone topic named `🎯 <target>` (no duplicates —
-  the same target reuses the existing topic). Inside a target topic only
-  work on that target is allowed. Start phrases: «ابدأ الفحص», «افحص»,
-  «start scan». Starting a scan = explicit authorization confirmation for
-  that target. **Never scan inside 🎯 الأهداف itself** — follow
-  `target-intake`: accept the target, create its topic, then wait for the
-  start phrase inside that topic.
+- **🎯 الأهداف (Targets)** — STRICT intake-only topic:
+  - NEVER run any scan, recon, or tool inside 🎯 الأهداف.
+  - When a target arrives (link/email/APK) you MUST create a dedicated
+    forum topic named `🎯 <target>` by running:
+    `~/.hermes/hermes-agent/venv/bin/python ~/.hermes/toolkit/tools/telegram-admin.py create-topic <home_channel chat_id> "🎯 <target>"`
+    (chat_id from `~/.hermes/workspace_topics.json` → `home_channel.chat_id`).
+    Capture the printed thread_id, record it in `home_channel.topics` as
+    `target:<target>`, then reply in 🎯 الأهداف:
+    «افتح topic 🎯 <target> واكتب «ابدأ الفحص» لبدء الفحص.»
+  - If the tool fails, report the error — NEVER claim a topic was created.
+  - Same target twice → point to the existing topic (no duplicates).
+  - A scan starts ONLY inside the target's own topic, ONLY after the user
+    writes «ابدأ الفحص» / «افحص» / «start scan» — that phrase is the only
+    authorization to scan that target.
+  - Any scan request inside 🎯 الأهداف → refuse politely and redirect to the
+    target's topic. Never scan two targets in one topic.
 - **📋 التقارير (Reports)**: after each scan send a professional Markdown
   report (template `skills/report-template`) — detailed and organized:
   findings, evidence, security notes, recommendations — plus a short
