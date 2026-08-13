@@ -10,20 +10,20 @@ WORKS BOTH WAYS:
   1) One-liner via irm | iex (local path or URL) -- recommended
      Note: irm needs an ABSOLUTE path or file:// URI (relative paths are rejected).
      $src = 'C:\path\to\Houdini'               # local package root
-     irm "$src\src\install-wsl.ps1" | iex
+     irm "$src\install-wsl.ps1" | iex
 
      # or from inside the package root (no $src needed):
      cd C:\path\to\Houdini
-     irm "$pwd\src\install-wsl.ps1" | iex
+     irm "$pwd\install-wsl.ps1" | iex
 
      $src = 'https://host/path'                # hosted package
-     irm "$src/src/install-wsl.ps1" | iex
+     irm "$src/install-wsl.ps1" | iex
 
      # optional overrides (caller variables, before the pipe):
-     $Distro = 'HoudiniGateway'; irm "$pwd\src\install-wsl.ps1" | iex
+     $Distro = 'HoudiniGateway'; irm "$pwd\install-wsl.ps1" | iex
 
   2) Classic script run
-     .\src\install-wsl.ps1 -Distro HoudiniGateway -RootfsPath C:\tmp\ubuntu.tar.gz
+     .\install-wsl.ps1 -Distro HoudiniGateway -RootfsPath C:\tmp\ubuntu.tar.gz
 
 Configuration precedence: CLI args (script run) > caller variables > env > defaults.
 Caller variables: $src, $Distro, $RootfsPath
@@ -105,7 +105,7 @@ for ($i = 0; $i -lt $args.Count; $i++) {
     if (-not $Here) {
         Fail "Could not locate the package. Set `$src before piping, e.g.:
 `$src = 'C:\path\to\Houdini'
-irm `"`$src\src\install-wsl.ps1`" | iex"
+irm `"`$src\install-wsl.ps1`" | iex"
     }
 
     $Remote = $Here -match '^https?://'

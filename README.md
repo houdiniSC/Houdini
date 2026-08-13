@@ -14,7 +14,7 @@ download:
 ```powershell
 git clone https://github.com/houdiniSC/Houdini.git
 cd Houdini
-.\src\install-wsl.ps1
+.\install-wsl.ps1
 ```
 
 Creates an isolated WSL distro (`HoudiniGateway`) running the Houdini agent
@@ -22,20 +22,20 @@ Creates an isolated WSL distro (`HoudiniGateway`) running the Houdini agent
 the rootfs locally to skip even the clone's rootfs download:
 
 ```powershell
-$RootfsPath = 'C:\path\to\ubuntu-rootfs.tar.gz'; .\src\install-wsl.ps1
+$RootfsPath = 'C:\path\to\ubuntu-rootfs.tar.gz'; .\install-wsl.ps1
 ```
 
 ## One-liner (PowerShell, from GitHub)
 
 ```powershell
-$src = 'https://raw.githubusercontent.com/houdiniSC/Houdini/main'; irm "$src/src/install-wsl.ps1" | iex
+$src = 'https://raw.githubusercontent.com/houdiniSC/Houdini/main'; irm "$src/install-wsl.ps1" | iex
 ```
 
 The one-liner downloads the repo zip once and reuses the rootfs chunks
 inside it (no extra rootfs download). Or point it at a local rootfs:
 
 ```powershell
-$src = 'https://raw.githubusercontent.com/houdiniSC/Houdini/main'; $RootfsPath = 'C:\path\to\ubuntu-rootfs.tar.gz'; irm "$src/src/install-wsl.ps1" | iex
+$src = 'https://raw.githubusercontent.com/houdiniSC/Houdini/main'; $RootfsPath = 'C:\path\to\ubuntu-rootfs.tar.gz'; irm "$src/install-wsl.ps1" | iex
 ```
 
 ## Native Ubuntu (no WSL)
@@ -46,7 +46,7 @@ Ubuntu machine:
 ```bash
 git clone https://github.com/houdiniSC/Houdini.git
 cd Houdini
-bash src/install-ubuntu.sh
+bash install-ubuntu.sh
 ```
 
 It reads optional settings from `src/secrets.env` (copy

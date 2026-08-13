@@ -6,7 +6,7 @@
 set -uo pipefail
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
-PACK_DIR="$SCRIPT_DIR/../knowledge-pack"
+PACK_DIR="$SCRIPT_DIR/knowledge-pack"
 SECRETS_FILE="$SCRIPT_DIR/secrets.env"
 HERMES_HOME="$HOME/.hermes"
 LOG="/tmp/houdini-bootstrap.log"
