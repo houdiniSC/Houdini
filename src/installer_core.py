@@ -901,8 +901,10 @@ class LiveInstaller:
                 self.on_log("hermes not installed — gateway skipped")
                 return False
             env = {"XDG_RUNTIME_DIR": f"/run/user/{os.getuid()}"}
-            ok = await self._sh("hermes gateway install", env=env)
-            ok = await self._sh("hermes gateway start", env=env) and ok
+            # hermes treats a TTY stdin as interactive and blocks on prompts
+            # (e.g. "start now?"). /dev/null forces its non-interactive path.
+            ok = await self._sh("hermes gateway install < /dev/null", env=env)
+            ok = await self._sh("hermes gateway start < /dev/null", env=env) and ok
             return ok
 
         if key == "webui":
