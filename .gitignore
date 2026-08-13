@@ -6,7 +6,8 @@ secrets.env
 secrets.env.*
 
 # large / dev artifacts
-rootfs/
+rootfs/hermes-rootfs.tar.gz
+rootfs/test-join.tar.gz
 _archive/
 work/
 .shots/

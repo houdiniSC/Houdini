@@ -182,27 +182,69 @@ irm `"`$src\bootstrap-wsl.ps1`" | iex"
         if (-not $rootfs) {
             $tmp = Join-Path $env:TEMP "hermes-rootfs.tar.gz"
             if (-not (Test-Path $tmp)) {
-                Log "Downloading Ubuntu 24.04 rootfs..."
-                $arch = if ($env:PROCESSOR_ARCHITECTURE -match "ARM") { "arm64" } else { "amd64" }
-                $rootfsUrl = "https://cdimages.ubuntu.com/ubuntu-wsl/noble/daily-live/current/noble-wsl-$arch.wsl"
-                Log "Downloading $rootfsUrl"
-                Invoke-WebRequest -UseBasicParsing -Uri $rootfsUrl -OutFile $tmp -TimeoutSec 600
-
-                # -- verify SHA256 against the published checksum file ------
-                try {
-                    $sumsRaw = (Invoke-WebRequest -UseBasicParsing -Uri "https://cdimages.ubuntu.com/ubuntu-wsl/noble/daily-live/current/SHA256SUMS" -TimeoutSec 60).Content
-                    $sums = if ($sumsRaw -is [byte[]]) { [System.Text.Encoding]::UTF8.GetString($sumsRaw) } else { [string]$sumsRaw }
-                    $expected = ($sums -split '\r?\n' | Where-Object { $_ -match "\*noble-wsl-$arch\.wsl" } | Select-Object -First 1).Trim().Split(" ")[0]
-                    if ($expected) {
-                        $actual = (Get-FileHash -Algorithm SHA256 -LiteralPath $tmp).Hash.ToLowerInvariant()
-                        if ($actual -ne $expected) {
-                            Remove-Item -LiteralPath $tmp -Force
-                            Fail "Rootfs checksum mismatch. Expected $expected, got $actual. Delete $tmp and re-run."
+                # GitHub-hosted rootfs chunks (raw base) — no Ubuntu download needed
+                $ghr = [regex]::Match($base, '^https://raw\.githubusercontent\.com/([^/]+)/([^/]+)/')
+                if ($ghr.Success) {
+                    try {
+                        Log "Downloading rootfs chunks from GitHub..."
+                        $parts = @()
+                        foreach ($c in @("hermes-rootfs.tar.gz.00", "hermes-rootfs.tar.gz.01",
+                                         "hermes-rootfs.tar.gz.02", "hermes-rootfs.tar.gz.03")) {
+                            $p = Join-Path $env:TEMP $c
+                            Invoke-WebRequest -UseBasicParsing -Uri "$base/rootfs/$c" -OutFile $p -TimeoutSec 900
+                            $parts += $p
                         }
-                        Log "Rootfs SHA256 verified ($actual)."
+                        $fs = [System.IO.File]::OpenWrite($tmp)
+                        foreach ($p in $parts) {
+                            $b = [System.IO.File]::ReadAllBytes($p)
+                            $fs.Write($b, 0, $b.Length)
+                        }
+                        $fs.Close()
+                        $rootfs_mb = [math]::Round((Get-Item $tmp).Length / 1MB)
+                        Log "Rootfs reassembled from GitHub chunks ($rootfs_mb MB)"
+                        try {
+                            $sumsRaw = (Invoke-WebRequest -UseBasicParsing -Uri "$base/rootfs/SHA256SUMS" -TimeoutSec 60).Content
+                            $sums = if ($sumsRaw -is [byte[]]) { [System.Text.Encoding]::UTF8.GetString($sumsRaw) } else { [string]$sumsRaw }
+                            $expected = ($sums -split '\r?\n' | Where-Object { $_ -match 'hermes-rootfs\.tar\.gz$' } | Select-Object -First 1).Trim().Split(" ")[0]
+                            if ($expected) {
+                                $actual = (Get-FileHash -Algorithm SHA256 -LiteralPath $tmp).Hash.ToLowerInvariant()
+                                if ($actual -ne $expected) {
+                                    Remove-Item -LiteralPath $tmp -Force
+                                    throw "rootfs SHA256 mismatch (expected $expected, got $actual)"
+                                }
+                                Log "Rootfs SHA256 verified from GitHub ($actual)."
+                            }
+                        } catch {
+                            Log "WARNING: could not verify rootfs checksum: $($_.Exception.Message)"
+                        }
+                    } catch {
+                        Log "WARNING: GitHub rootfs download failed: $($_.Exception.Message) - falling back to Ubuntu."
+                        Remove-Item -LiteralPath $tmp -Force
                     }
-                } catch {
-                    Log "WARNING: could not verify rootfs checksum: $($_.Exception.Message)"
+                }
+                if (-not (Test-Path $tmp)) {
+                    Log "Downloading Ubuntu 24.04 rootfs..."
+                    $arch = if ($env:PROCESSOR_ARCHITECTURE -match "ARM") { "arm64" } else { "amd64" }
+                    $rootfsUrl = "https://cdimages.ubuntu.com/ubuntu-wsl/noble/daily-live/current/noble-wsl-$arch.wsl"
+                    Log "Downloading $rootfsUrl"
+                    Invoke-WebRequest -UseBasicParsing -Uri $rootfsUrl -OutFile $tmp -TimeoutSec 600
+
+                    # -- verify SHA256 against the published checksum file ------
+                    try {
+                        $sumsRaw = (Invoke-WebRequest -UseBasicParsing -Uri "https://cdimages.ubuntu.com/ubuntu-wsl/noble/daily-live/current/SHA256SUMS" -TimeoutSec 60).Content
+                        $sums = if ($sumsRaw -is [byte[]]) { [System.Text.Encoding]::UTF8.GetString($sumsRaw) } else { [string]$sumsRaw }
+                        $expected = ($sums -split '\r?\n' | Where-Object { $_ -match "\*noble-wsl-$arch\.wsl" } | Select-Object -First 1).Trim().Split(" ")[0]
+                        if ($expected) {
+                            $actual = (Get-FileHash -Algorithm SHA256 -LiteralPath $tmp).Hash.ToLowerInvariant()
+                            if ($actual -ne $expected) {
+                                Remove-Item -LiteralPath $tmp -Force
+                                Fail "Rootfs checksum mismatch. Expected $expected, got $actual. Delete $tmp and re-run."
+                            }
+                            Log "Rootfs SHA256 verified ($actual)."
+                        }
+                    } catch {
+                        Log "WARNING: could not verify rootfs checksum: $($_.Exception.Message)"
+                    }
                 }
             }
             $rootfs = $tmp
