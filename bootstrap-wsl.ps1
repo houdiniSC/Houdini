@@ -69,8 +69,7 @@ for ($i = 0; $i -lt $args.Count; $i++) {
             $candidates += @(Get-ChildItem -Directory -LiteralPath $dir -ErrorAction SilentlyContinue |
                 Sort-Object Name | ForEach-Object { $_.FullName })
             foreach ($candidate in $candidates) {
-                if ((Test-Path (Join-Path $candidate "installer-tui.py")) -and
-                    (Test-Path (Join-Path $candidate "install-config.json"))) {
+                if (Test-Path (Join-Path $candidate "installer-tui.py")) {
                     return $candidate
                 }
             }
@@ -183,6 +182,41 @@ irm `"`$src\bootstrap-wsl.ps1`" | iex"
         if (-not $rootfs) {
             $tmp = Join-Path $env:TEMP "hermes-rootfs.tar.gz"
             if (-not (Test-Path $tmp)) {
+                # Local git clone (or extracted repo zip): the rootfs chunks
+                # are already on disk - reassemble them instead of downloading.
+                $localParts = @()
+                foreach ($c in @("hermes-rootfs.tar.gz.00", "hermes-rootfs.tar.gz.01",
+                                 "hermes-rootfs.tar.gz.02", "hermes-rootfs.tar.gz.03")) {
+                    $p = Join-Path $InstallerDir "rootfs\$c"
+                    if (Test-Path $p) { $localParts += $p }
+                }
+                if ($localParts.Count -eq 4) {
+                    try {
+                        Log "Reassembling rootfs from local chunks (no download)..."
+                        $fs = [System.IO.File]::OpenWrite($tmp)
+                        foreach ($p in $localParts) {
+                            $b = [System.IO.File]::ReadAllBytes($p)
+                            $fs.Write($b, 0, $b.Length)
+                        }
+                        $fs.Close()
+                        $sumsFile = Join-Path $InstallerDir "rootfs\SHA256SUMS"
+                        if (Test-Path $sumsFile) {
+                            $expected = ((Get-Content $sumsFile |
+                                Where-Object { $_ -match 'hermes-rootfs\.tar\.gz$' } |
+                                Select-Object -First 1).Trim().Split(" ")[0])
+                            if ($expected) {
+                                $actual = (Get-FileHash -Algorithm SHA256 -LiteralPath $tmp).Hash.ToLowerInvariant()
+                                if ($actual -ne $expected) {
+                                    throw "local rootfs SHA256 mismatch (expected $expected, got $actual)"
+                                }
+                                Log "Rootfs SHA256 verified from local chunks ($actual)."
+                            }
+                        }
+                    } catch {
+                        Log "WARNING: local rootfs reassembly failed: $($_.Exception.Message)"
+                        Remove-Item -LiteralPath $tmp -Force -ErrorAction SilentlyContinue
+                    }
+                }
                 # GitHub-hosted rootfs chunks (raw base) — no Ubuntu download needed
                 $ghr = [regex]::Match($base, '^https://raw\.githubusercontent\.com/([^/]+)/([^/]+)/')
                 if ($ghr.Success) {
