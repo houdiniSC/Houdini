@@ -31,13 +31,16 @@ from textual.widgets import (
     Footer,
     Header,
     Input,
-    OptionList,
+    ListItem,
+    ListView,
     ProgressBar,
     RadioButton,
     RadioSet,
     RichLog,
     Select,
     Static,
+    Tab,
+    Tabs,
 )
 
 from installer_core import (
@@ -124,11 +127,14 @@ class WizardScreen(Screen):
                 yield Static("HOUDINI", id="logo")
                 yield Static("BOOTSTRAP INSTALLER", id="subtitle")
                 yield Static("", id="side_gradient")
-                yield Static("", id="step_list")
                 yield ProgressBar(total=len(STEP_DEFS), show_eta=False, id="side_progress")
                 yield Static("", id="status_line")
             with Vertical(id="content"):
                 yield Static("", id="content_title")
+                yield Tabs(
+                    *[Tab(label, id=key) for key, label in STEP_DEFS],
+                    id="step_tabs",
+                )
                 with ContentSwitcher(id="steps"):
                     with Vertical(id="step-welcome", classes="step"):
                         yield Static("", id="welcome_gradient")
@@ -250,7 +256,7 @@ class WizardScreen(Screen):
                     with Vertical(id="step-tools", classes="step"):
                         yield Static("Tool categories - pick one to see its tools.", classes="hint")
                         with Horizontal(id="tools_split"):
-                            yield OptionList(id="tool_cats")
+                            yield ListView(id="tool_cats")
                             with ContentSwitcher(id="tool_panes"):
                                 for cat in TOOL_CATS:
                                     with Vertical(id=f"tool_pane_{cat}", classes="pane"):
@@ -264,7 +270,7 @@ class WizardScreen(Screen):
                     with Vertical(id="step-secrets", classes="step"):
                         yield Static("Provider groups - one key per service.", classes="hint")
                         with Horizontal(id="secrets_split"):
-                            yield OptionList(id="secret_groups")
+                            yield ListView(id="secret_groups")
                             with ContentSwitcher(id="secret_panes"):
                                 for group, glabel in SECRET_GROUPS:
                                     with Vertical(id=f"secret_pane_{group}", classes="pane"):
@@ -347,14 +353,16 @@ class WizardScreen(Screen):
         self.install_done = False
         self._refresh_timer = None
 
-        self.query_one("#tool_cats", OptionList).add_options(
-            [TOOL_CAT_LABELS.get(c, c) for c in TOOL_CATS]
+        self.query_one("#tool_cats", ListView).extend(
+            [ListItem(Static(TOOL_CAT_LABELS.get(c, c))) for c in TOOL_CATS]
         )
-        self.query_one("#secret_groups", OptionList).add_options(
-            [label for _key, label in SECRET_GROUPS]
+        self.query_one("#secret_groups", ListView).extend(
+            [ListItem(Static(label)) for _key, label in SECRET_GROUPS]
         )
         self.query_one("#tool_panes", ContentSwitcher).current = f"tool_pane_{TOOL_CATS[0]}"
         self.query_one("#secret_panes", ContentSwitcher).current = f"secret_pane_{SECRET_GROUPS[0][0]}"
+        self.query_one("#tool_cats", ListView).index = 0
+        self.query_one("#secret_groups", ListView).index = 0
 
         try:
             self.query_one("#side_gradient", Static).update(
@@ -401,15 +409,7 @@ class WizardScreen(Screen):
 
     def _update_sidebar(self) -> None:
         idx = self._step_index(self.current)
-        lines = []
-        for i, (key, label) in enumerate(STEP_DEFS, 1):
-            if key == self.current:
-                lines.append(f"[bold {CYAN}]o[/] [{CYAN}]{i:02d} {label.upper()}[/]")
-            elif i < idx:
-                lines.append(f"[{EMERALD}]v[/] [{SLATE_DIM}]{i:02d} {label.upper()}[/]")
-            else:
-                lines.append(f"[{SLATE_FAINT}]x[/] [{SLATE_FAINT}]{i:02d} {label.upper()}[/]")
-        self.query_one("#step_list", Static).update("\n".join(lines))
+        self.query_one("#step_tabs", Tabs).active = self.current
         self.query_one("#side_progress", ProgressBar).progress = idx
         current_label = STEP_DEFS[idx][1].upper()
         self.query_one("#status_line", Static).update(
@@ -717,16 +717,34 @@ class WizardScreen(Screen):
         self.app.data["memory"] = self.query_one("#memory_enable", Checkbox).value
 
     # ------------------------------------------------------------ events
-    def on_option_list_option_selected(self, event: OptionList.OptionSelected) -> None:
-        prompt = getattr(event.option, "prompt", None)
-        if not isinstance(prompt, str):
-            prompt = getattr(prompt, "plain", str(prompt))
+    @staticmethod
+    def _list_item_label(item) -> str:
+        try:
+            static = item.query_one(Static)
+            renderable = getattr(static, "renderable", "")
+            return getattr(renderable, "plain", str(renderable))
+        except Exception:
+            return ""
+
+    def on_list_view_highlighted(self, event: ListView.Highlighted) -> None:
+        prompt = self._list_item_label(event.item) if event.item is not None else ""
         if prompt in TOOL_CAT_LABELS.values():
             cat = next(c for c, label in TOOL_CAT_LABELS.items() if label == prompt)
             self.query_one("#tool_panes", ContentSwitcher).current = f"tool_pane_{cat}"
         elif prompt in [label for _k, label in SECRET_GROUPS]:
             group = next(k for k, label in SECRET_GROUPS if label == prompt)
             self.query_one("#secret_panes", ContentSwitcher).current = f"secret_pane_{group}"
+
+    async def on_tabs_tab_activated(self, event: Tabs.TabActivated) -> None:
+        tab = getattr(event, "tab", None)
+        tid = getattr(tab, "id", None)
+        if not tid or tid not in [k for k, _l in STEP_DEFS]:
+            return
+        if self.current == "install" and not self.install_done:
+            return  # do not leave the live-install step mid-run
+        if tid == "summary" and not self.install_done:
+            return
+        await self._show(tid)
 
     def on_radio_set_changed(self, event: RadioSet.Changed) -> None:
         rs = getattr(event, "radio_set", None)
@@ -925,13 +943,13 @@ class HoudiniInstaller(App):
     #logo { text-style: bold; color: $accent; }
     #subtitle { color: $text-muted; margin-bottom: 2; }
     #side_gradient { height: 2; margin-bottom: 1; }
-    #step_list { height: auto; margin-bottom: 1; }
     #side_progress { margin-bottom: 1; }
     #status_line { color: $text-muted; margin-top: 1; }
 
     #content { width: 1fr; height: 100%; padding: 1 2; }
     #content_title { text-style: bold; margin-bottom: 1; }
 
+    #step_tabs { margin-bottom: 1; }
     #steps {
         height: 1fr;
         border: round $primary;
@@ -1011,6 +1029,7 @@ async def selftest() -> None:
             await pilot.pause()
             assert app.screen is not None
             assert app.screen.query_one("#welcome_start", Button) is not None
+            assert app.screen.query_one("#step_tabs", Tabs) is not None
             await press("welcome_start")  # welcome -> config
             await press("next")  # config (skip) -> core
             app.screen.query_one("#api_key", Input).value = "sk-demo-value"
@@ -1034,8 +1053,8 @@ async def selftest() -> None:
             assert app.data["secrets"]["model_base_url"] == "https://opencode.ai/zen/v1"
             app.screen.query_one("#decide_custom", Button).press()
             await pilot.pause()
-            cats = app.screen.query_one("#tool_cats", OptionList)
-            assert cats.option_count >= 1
+            cats = app.screen.query_one("#tool_cats", ListView)
+            assert len(cats.children) >= 1
             assert app.screen.query_one("#tool_nuclei", Checkbox).value is True
             assert app.screen.query_one("#tool_nmap", Checkbox).value is True
             await press("next")  # tools -> secrets
