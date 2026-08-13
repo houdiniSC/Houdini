@@ -126,7 +126,7 @@ MODEL_PROVIDERS = {
 
 SUDO_MODES = [
     ("restricted", "Restricted (recommended)", "openvpn, systemctl, apt, nmap, tcpdump, docker"),
-    ("wide", "Wide (everything)", "NOPASSWD: ALL"),
+    ("wide", "Wide (everything)", "NOPASSWD: SETENV: ALL"),
     ("none", "None", "leave sudo as-is"),
 ]
 
@@ -622,8 +622,12 @@ class LiveInstaller:
             if tool_path("wpscan"):
                 self.on_log("wpscan already installed — skipping")
                 return True
-            # standard location: system gem install puts wpscan in /usr/local/bin
-            return await self._sh("sudo gem install wpscan") or await self._sh("gem install wpscan")
+            # wpscan is a ruby gem; native extensions need the ruby headers
+            # (ruby-dev). Without them `gem install` fails to build.
+            ok = await self._sh(
+                "sudo apt-get install -y -qq ruby-dev && sudo gem install wpscan"
+            )
+            return ok or await self._sh("gem install wpscan")
 
         if key == "templates":
             if tools.get("nuclei") and tool_path("nuclei"):
@@ -756,10 +760,10 @@ class LiveInstaller:
                 return True
             user = getpass.getuser()
             if mode == "wide":
-                line = f"{user} ALL=(ALL) NOPASSWD: ALL"
+                line = f"{user} ALL=(ALL) NOPASSWD: SETENV: ALL"
             else:
                 line = (
-                    f"{user} ALL=(ALL) NOPASSWD: /usr/sbin/openvpn, /usr/bin/systemctl, "
+                    f"{user} ALL=(ALL) NOPASSWD: SETENV: /usr/sbin/openvpn, /usr/bin/systemctl, "
                     "/usr/bin/apt, /usr/bin/apt-get, /usr/bin/nmap, /usr/sbin/tcpdump, /usr/bin/docker"
                 )
             dest = f"/etc/sudoers.d/hermes-{user}"

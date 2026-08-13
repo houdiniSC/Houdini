@@ -305,7 +305,7 @@ set -e
 printf '[boot]\nsystemd=true\n' > /etc/wsl.conf
 # dedicated agent user with passwordless sudo for the installer session
 id hermes >/dev/null 2>&1 || useradd -m -s /bin/bash hermes
-printf 'hermes ALL=(ALL) NOPASSWD: ALL\n' > /etc/sudoers.d/hermes-bootstrap
+printf 'hermes ALL=(ALL) NOPASSWD: SETENV: ALL\n' > /etc/sudoers.d/hermes-bootstrap
 chmod 440 /etc/sudoers.d/hermes-bootstrap
 apt-get update -qq
 apt-get install -y -qq python3 python3-pip python3-venv curl git unzip

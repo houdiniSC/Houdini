@@ -299,10 +299,10 @@ else
 fi
 case "$SUDO_MODE" in
   *واسع*)
-    SUDOERS_LINE="$USER ALL=(ALL) NOPASSWD: ALL"
+    SUDOERS_LINE="$USER ALL=(ALL) NOPASSWD: SETENV: ALL"
     ;;
   *مقنّن*)
-    SUDOERS_LINE="$USER ALL=(ALL) NOPASSWD: /usr/sbin/openvpn, /usr/bin/systemctl, /usr/bin/apt, /usr/bin/apt-get, /usr/bin/nmap, /usr/sbin/tcpdump, /usr/bin/docker"
+    SUDOERS_LINE="$USER ALL=(ALL) NOPASSWD: SETENV: /usr/sbin/openvpn, /usr/bin/systemctl, /usr/bin/apt, /usr/bin/apt-get, /usr/bin/nmap, /usr/sbin/tcpdump, /usr/bin/docker"
     ;;
   *)
     SUDOERS_LINE=""
