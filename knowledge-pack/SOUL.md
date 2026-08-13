@@ -68,7 +68,10 @@ refused with a pointer to the right place:
     `~/.hermes/hermes-agent/venv/bin/python ~/.hermes/toolkit/tools/telegram-admin.py create-topic <home_channel chat_id> "🎯 <target>"`
     (chat_id from `~/.hermes/workspace_topics.json` → `home_channel.chat_id`).
     Capture the printed thread_id, record it in `home_channel.topics` as
-    `target:<target>`, then reply in 🎯 الأهداف:
+    `target:<target>`, and record the session title in
+    `~/.hermes/topic_titles.json` as `"<chat_id>:<thread_id>": "🎯 <target>"`
+    (so the WebUI shows the topic name, not the group name). Then reply in
+    🎯 الأهداف:
     «افتح topic 🎯 <target> واكتب «ابدأ الفحص» لبدء الفحص.»
   - If the tool fails, report the error — NEVER claim a topic was created.
   - Same target twice → point to the existing topic (no duplicates).
