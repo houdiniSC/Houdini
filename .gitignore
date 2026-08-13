@@ -3,7 +3,6 @@ install-config.json
 install-config.hcfg
 secrets.env
 *.hcfg
-secrets.env.*
 
 # large / dev artifacts
 rootfs/hermes-rootfs.tar.gz
