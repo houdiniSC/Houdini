@@ -102,25 +102,25 @@ MODEL_PROVIDERS = {
         "label": "DeepSeek",
         "base_url": "https://api.deepseek.com/v1",
         "default_model": "deepseek-v4-flash",
-        "models": "deepseek-v4-flash / deepseek-v4-pro",
+        "preset_models": ["deepseek-v4-flash", "deepseek-v4-pro"],
     },
     "openai": {
         "label": "OpenAI",
         "base_url": "https://api.openai.com/v1",
         "default_model": "gpt-5.4",
-        "models": "gpt-5.4 / gpt-5.4-mini / gpt-5.4-nano",
+        "preset_models": ["gpt-5.4", "gpt-5.4-mini", "gpt-5.4-nano"],
     },
     "opencode": {
         "label": "OpenCode",
         "base_url": "https://opencode.ai/zen/v1",
         "default_model": "deepseek-v4-flash",
-        "models": "deepseek-v4-flash / deepseek-v4-flash-free",
+        "preset_models": ["deepseek-v4-flash", "deepseek-v4-flash-free"],
     },
     "custom": {
         "label": "Custom (OpenAI-compatible)",
         "base_url": "",
         "default_model": "",
-        "models": "any OpenAI-compatible model ID",
+        "preset_models": [],
     },
 }
 
@@ -129,6 +129,47 @@ SUDO_MODES = [
     ("wide", "Wide (everything)", "NOPASSWD: ALL"),
     ("none", "None", "leave sudo as-is"),
 ]
+
+
+def fetch_model_list(base_url: str, api_key: str, timeout: float = 12.0) -> list[str] | None:
+    """Fetch the live OpenAI-compatible model catalog (GET {base_url}/models).
+
+    Returns a sorted list of model ids, or None when the endpoint is
+    unreachable / rejects the key - callers fall back to curated presets.
+    """
+    import urllib.request
+
+    if not base_url or not api_key:
+        return None
+    url = base_url.rstrip("/") + "/models"
+    req = urllib.request.Request(
+        url,
+        headers={
+            "Authorization": f"Bearer {api_key}",
+            "Accept": "application/json",
+        },
+    )
+    try:
+        with urllib.request.urlopen(req, timeout=timeout) as resp:
+            data = json.loads(resp.read().decode("utf-8"))
+    except Exception:
+        return None
+    rows = data.get("data") if isinstance(data, dict) else None
+    if not isinstance(rows, list):
+        return None
+    ids = sorted(
+        {str(row["id"]) for row in rows if isinstance(row, dict) and row.get("id")}
+    )
+    return ids or None
+
+
+def model_choices(provider: str, base_url: str, api_key: str) -> list[str]:
+    """Live catalog first (provider endpoint), curated presets as fallback."""
+    preset = MODEL_PROVIDERS.get(provider, MODEL_PROVIDERS["custom"])
+    live = fetch_model_list(base_url, api_key)
+    if live:
+        return live
+    return list(preset.get("preset_models") or [])
 
 
 def ensure_holographic_memory(text: str) -> str:

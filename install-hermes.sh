@@ -241,11 +241,35 @@ case "$MODEL_PROVIDER" in
   custom)   DEFAULT_MODEL="";                  DEFAULT_BASE_URL="" ;;
   *)        MODEL_PROVIDER="deepseek";         DEFAULT_MODEL="deepseek-v4-flash"; DEFAULT_BASE_URL="https://api.deepseek.com/v1" ;;
 esac
-ask_sec model "AI Model" "معرف الموديل (اتركه فارغًا للافتراضي: $DEFAULT_MODEL)" model
-[ -n "$model" ] || model="$DEFAULT_MODEL"
 ask_sec model_base_url "AI Base URL" "رابط API (فارغ = تلقائي للمزود; مطلوب فقط عند Custom)" model_base_url
 [ -n "$model_base_url" ] || model_base_url="$DEFAULT_BASE_URL"
 ask_sec api_key "AI API Key" "مفتاح API للمزود (sk-...)" api_key
+
+# Dynamic model list: live catalog from the provider's OpenAI-compatible
+# /models endpoint (uses the key above); curated presets as fallback.
+case "$MODEL_PROVIDER" in
+  openai)   PRESET_MODELS=(gpt-5.4 gpt-5.4-mini gpt-5.4-nano) ;;
+  opencode) PRESET_MODELS=(deepseek-v4-flash deepseek-v4-flash-free) ;;
+  custom)   PRESET_MODELS=() ;;
+  *)        PRESET_MODELS=(deepseek-v4-flash deepseek-v4-pro) ;;
+esac
+MODEL_CHOICES=()
+if [ -n "$api_key" ] && [ -n "$model_base_url" ] \
+    && command -v curl >/dev/null 2>&1 && command -v jq >/dev/null 2>&1; then
+  while IFS= read -r m; do [ -n "$m" ] && MODEL_CHOICES+=("$m"); done < <(
+    curl -fsS -m 15 -H "Authorization: Bearer $api_key" "$model_base_url/models" 2>/dev/null \
+      | jq -r '.data[].id' 2>/dev/null | sort -u
+  )
+fi
+[ "${#MODEL_CHOICES[@]}" -gt 0 ] || MODEL_CHOICES=("${PRESET_MODELS[@]}")
+if [ "${#MODEL_CHOICES[@]}" -gt 40 ]; then
+  MODEL_CHOICES=("${MODEL_CHOICES[@]:0:40}")
+fi
+model="$(get_env model)"
+if [ -z "$model" ] && [ "$CUSTOMIZE" = 1 ] && [ "${#MODEL_CHOICES[@]}" -gt 1 ]; then
+  model=$(ui_radio "AI Model" "اختر الموديل (قائمة $MODEL_PROVIDER):" "${MODEL_CHOICES[@]}")
+fi
+[ -n "$model" ] || model="${DEFAULT_MODEL:-}"
 ask_sec users "Telegram Users" "معرفات المستخدمين المسموحين (فواصل)" users
 ask_sec github "Recon - GitHub" "GitHub PAT (subfinder + gh/git)" github
 ask_sec virustotal "Recon - VirusTotal" "مفتاح VirusTotal" virustotal

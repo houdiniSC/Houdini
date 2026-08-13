@@ -37,6 +37,7 @@ from textual.widgets import (
     RadioButton,
     RadioSet,
     RichLog,
+    Select,
     Static,
 )
 
@@ -50,6 +51,7 @@ from installer_core import (
     TOOLS,
     LiveInstaller,
     load_install_config,
+    model_choices,
     tool_path,
 )
 
@@ -174,8 +176,15 @@ class WizardScreen(Screen):
                             *[p["label"] for p in MODEL_PROVIDERS.values()],
                             id="model_providers",
                         )
+                        yield Select(
+                            [],
+                            prompt="Model list (live - click to pick)",
+                            allow_blank=True,
+                            disabled=True,
+                            id="model_select",
+                        )
                         yield Input(
-                            placeholder="Model ID (e.g. deepseek-v4-flash)",
+                            placeholder="Model ID (pick from the list or type custom)",
                             id="model",
                         )
                         yield Input(
@@ -307,6 +316,7 @@ class WizardScreen(Screen):
         self.current = "welcome"
         self.config_loaded = False
         self.install_done = False
+        self._key_timer = None
 
         self.query_one("#tool_cats", OptionList).add_options(
             [TOOL_CAT_LABELS.get(c, c) for c in TOOL_CATS]
@@ -562,20 +572,65 @@ class WizardScreen(Screen):
             except Exception:
                 continue
 
-    def _apply_model_preset(self, provider: str) -> None:
+    def _apply_model_preset(self, provider: str, refresh: bool = True) -> None:
         preset = MODEL_PROVIDERS.get(provider, MODEL_PROVIDERS["custom"])
         model_input = self.query_one("#model", Input)
         base_input = self.query_one("#model_base_url", Input)
+        select = self.query_one("#model_select", Select)
         defaults = {p["default_model"] for p in MODEL_PROVIDERS.values()}
         current = model_input.value.strip()
         if not current or current in defaults:
             model_input.value = preset["default_model"]
-        model_input.placeholder = f"Model ID: {preset['models']}"
+        model_input.placeholder = "Model ID (pick from the list or type custom)"
+        select.set_options(
+            [(m, m) for m in preset.get("preset_models", [])]
+            + [("Custom... (type below)", "__custom__")]
+        )
+        select.disabled = False
         if provider == "custom":
             base_input.placeholder = "Base URL (required for custom endpoints)"
         else:
             base_input.placeholder = "Base URL (auto-filled)"
             base_input.value = preset["base_url"]
+        if (
+            refresh
+            and not self.app.dry_run
+            and self.query_one("#api_key", Input).value.strip()
+        ):
+            self.run_worker(self._refresh_model_list(provider))
+
+    def _selected_provider(self) -> str:
+        rs = self.query_one("#model_providers", RadioSet)
+        for rb in rs.query(RadioButton):
+            if rb.value and rb.label is not None:
+                lbl = rb.label.plain
+                return next(
+                    (k for k, p in MODEL_PROVIDERS.items() if p["label"] == lbl),
+                    "custom",
+                )
+        return "deepseek"
+
+    async def _refresh_model_list(self, provider: str) -> None:
+        """Live model catalog from the provider endpoint (curated fallback)."""
+        if self.app.dry_run:
+            return
+        preset = MODEL_PROVIDERS.get(provider, MODEL_PROVIDERS["custom"])
+        base_url = (
+            self.query_one("#model_base_url", Input).value.strip()
+            or preset["base_url"]
+        )
+        api_key = self.query_one("#api_key", Input).value.strip()
+        if not base_url or not api_key:
+            return
+        models = await asyncio.to_thread(model_choices, provider, base_url, api_key)
+        if not models:
+            return  # keep curated presets
+        if self._selected_provider() != provider:
+            return  # stale result - provider changed while fetching
+        select = self.query_one("#model_select", Select)
+        select.set_options(
+            [(m, m) for m in models] + [("Custom... (type below)", "__custom__")]
+        )
 
     # ------------------------------------------------------- data collect
     def _collect_tools(self) -> None:
@@ -592,17 +647,13 @@ class WizardScreen(Screen):
 
     def _collect_core(self) -> None:
         secrets = self.app.data["secrets"]
-        rs = self.query_one("#model_providers", RadioSet)
-        provider = "deepseek"
-        for rb in rs.query(RadioButton):
-            if rb.value and rb.label is not None:
-                lbl = rb.label.plain
-                provider = next(
-                    (k for k, p in MODEL_PROVIDERS.items() if p["label"] == lbl),
-                    "custom",
-                )
-                break
-        self._apply_model_preset(provider)
+        provider = self._selected_provider()
+        select = self.query_one("#model_select", Select)
+        if select.value not in (Select.BLANK, Select.NULL, "__custom__"):
+            model_input = self.query_one("#model", Input)
+            if not model_input.value.strip():
+                model_input.value = str(select.value)
+        self._apply_model_preset(provider, refresh=False)
         secrets["model_provider"] = provider
         secrets["model"] = self.query_one("#model", Input).value.strip()
         secrets["model_base_url"] = self.query_one(
@@ -668,6 +719,34 @@ class WizardScreen(Screen):
                 "custom",
             )
             self._apply_model_preset(provider)
+
+    def on_select_changed(self, event: Select.Changed) -> None:
+        sel = getattr(event, "select", None)
+        if sel is None or getattr(sel, "id", None) != "model_select":
+            return
+        value = event.value
+        if value in (Select.BLANK, Select.NULL):
+            return
+        model_input = self.query_one("#model", Input)
+        if value == "__custom__":
+            model_input.value = ""
+            model_input.focus()
+            return
+        model_input.value = str(value)
+
+    def on_input_changed(self, event: Input.Changed) -> None:
+        if event.input.id == "api_key":
+            if self._key_timer is not None:
+                self._key_timer.stop()
+            self._key_timer = None
+            if self.app.dry_run or not event.value.strip():
+                return
+            self._key_timer = self.set_timer(
+                0.8,
+                lambda: self.run_worker(
+                    self._refresh_model_list(self._selected_provider())
+                ),
+            )
 
     # ------------------------------------------------------------ review
     def _fill_review(self) -> None:
@@ -917,11 +996,16 @@ async def selftest() -> None:
                     rb.value = True
                     break
             await pilot.pause()
+            sel = app.screen.query_one("#model_select", Select)
+            assert not sel.disabled
+            assert len(sel._options) >= 4  # blank + curated presets + custom
+            sel.value = "deepseek-v4-flash-free"
+            await pilot.pause()
             await press("next")  # core -> decide
             assert app.screen.query_one("#decide_custom", Button) is not None
             assert app.screen.query_one("#decide_quick", Button) is not None
             assert app.data["secrets"]["model_provider"] == "opencode"
-            assert app.data["secrets"]["model"] == "deepseek-v4-flash"
+            assert app.data["secrets"]["model"] == "deepseek-v4-flash-free"
             assert app.data["secrets"]["model_base_url"] == "https://opencode.ai/zen/v1"
             app.screen.query_one("#decide_custom", Button).press()
             await pilot.pause()
