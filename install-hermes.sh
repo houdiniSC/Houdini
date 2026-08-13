@@ -214,12 +214,38 @@ ask_tool() { # ask_tool <title> <text> -> 0 install / 1 skip (default: yes)
   [ "$CUSTOMIZE" = 1 ] && ui_yesno "$1" "$2" || return 0
 }
 
-ask_sec deepseek "DeepSeek" "مفتاح DeepSeek API (sk-...)" deepseek
 ask_sec bot "Telegram Bot" "توكن البوت من @BotFather" bot
 CUSTOMIZE=0
 if ui_yesno "Customize" "متابعة تهيئة المفاتيح والأدوات الاختيارية؟ (لا = تثبيت سريع بالإعدادات الافتراضية)"; then
   CUSTOMIZE=1
 fi
+
+# AI provider (OpenAI-compatible) - interactive: pick a provider, enter the
+# API key and (optionally) choose the model. Endpoints are presets, so the
+# user never has to type a base URL unless they pick Custom.
+MODEL_PROVIDER="$(get_env model_provider)"
+if [ -z "$MODEL_PROVIDER" ] && [ "$CUSTOMIZE" = 1 ]; then
+  MODEL_PROVIDER=$(ui_radio "AI Provider" "اختر مزود الذكاء الاصطناعي (OpenAI-compatible):" \
+    "DeepSeek" "OpenAI" "OpenCode" "Custom")
+fi
+case "$MODEL_PROVIDER" in
+  OpenAI)  MODEL_PROVIDER=openai ;;
+  OpenCode) MODEL_PROVIDER=opencode ;;
+  Custom)  MODEL_PROVIDER=custom ;;
+  openai|opencode|custom) ;;
+  *)       MODEL_PROVIDER=deepseek ;;
+esac
+case "$MODEL_PROVIDER" in
+  openai)   DEFAULT_MODEL="gpt-5.4";           DEFAULT_BASE_URL="https://api.openai.com/v1" ;;
+  opencode) DEFAULT_MODEL="deepseek-v4-flash"; DEFAULT_BASE_URL="https://opencode.ai/zen/v1" ;;
+  custom)   DEFAULT_MODEL="";                  DEFAULT_BASE_URL="" ;;
+  *)        MODEL_PROVIDER="deepseek";         DEFAULT_MODEL="deepseek-v4-flash"; DEFAULT_BASE_URL="https://api.deepseek.com/v1" ;;
+esac
+ask_sec model "AI Model" "معرف الموديل (اتركه فارغًا للافتراضي: $DEFAULT_MODEL)" model
+[ -n "$model" ] || model="$DEFAULT_MODEL"
+ask_sec model_base_url "AI Base URL" "رابط API (فارغ = تلقائي للمزود; مطلوب فقط عند Custom)" model_base_url
+[ -n "$model_base_url" ] || model_base_url="$DEFAULT_BASE_URL"
+ask_sec api_key "AI API Key" "مفتاح API للمزود (sk-...)" api_key
 ask_sec users "Telegram Users" "معرفات المستخدمين المسموحين (فواصل)" users
 ask_sec github "Recon - GitHub" "GitHub PAT (subfinder + gh/git)" github
 ask_sec virustotal "Recon - VirusTotal" "مفتاح VirusTotal" virustotal
@@ -270,10 +296,18 @@ fi
 ui_info "Config" "كتابة الإعدادات..."
 mkdir -p "$HERMES_HOME"
 
-if [ -n "$deepseek" ]; then
-  sed -e "s/__DEEPSEEK_API_KEY__/$deepseek/" \
-      "$HERMES_HOME/config.template.yaml" > "$HERMES_HOME/config.yaml" 2>/dev/null
-  printf '\nDEEPSEEK_API_KEY=%s\n' "$deepseek" >> "$HERMES_HOME/.env"
+if [ -n "$api_key" ] && [ -n "$model" ] && [ -n "$model_base_url" ]; then
+  python3 - "$HERMES_HOME/config.template.yaml" "$HERMES_HOME/config.yaml" \
+      "$model" "$model_base_url" "$api_key" <<'PY' >> "$LOG" 2>&1
+import sys
+tpl, out, model, base_url, key = sys.argv[1:6]
+text = open(tpl, encoding="utf-8").read()
+text = (text.replace("__MODEL_ID__", model)
+            .replace("__MODEL_BASE_URL__", base_url)
+            .replace("__API_KEY__", key))
+open(out, "w", encoding="utf-8").write(text)
+PY
+  printf '\nOPENAI_API_KEY=%s\n' "$api_key" >> "$HERMES_HOME/.env"
 fi
 
 if [ -n "$bot" ]; then
@@ -423,8 +457,8 @@ fi
 
 # ── 10) Summary ────────────────────────────────────────────────────────────
 MISSING=""
-[ -z "$deepseek" ]    && MISSING="$MISSING
-• DeepSeek API key (بدونه لن يعمل الوكيل)"
+[ -z "$api_key" ] && MISSING="$MISSING
+• AI API key (بدونه لن يعمل الوكيل)"
 [ -z "$bot" ]  && MISSING="$MISSING
 • Telegram bot token (بدونه لن تعمل البوابة)"
 [ -z "$ngrok" ]     && MISSING="$MISSING

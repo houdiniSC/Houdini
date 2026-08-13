@@ -3,6 +3,7 @@ install-config.json
 install-config.hcfg
 secrets.env
 *.hcfg
+export-config.py
 
 # large / dev artifacts
 rootfs/hermes-rootfs.tar.gz

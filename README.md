@@ -22,9 +22,10 @@ irm "$src/bootstrap-wsl.ps1" | iex
 
 ## Config
 
-Only two values are required at install: the DeepSeek API key and the
-Telegram bot token. Everything else is optional and can be detected or
-added later at first conversation.
+Only two values are required at install: an AI model API key (any
+OpenAI-compatible provider - DeepSeek, OpenAI, OpenCode or a custom
+endpoint) and the Telegram bot token. Everything else is optional and
+can be detected or added later at first conversation.
 
 For a fast scripted install, copy `secrets.env.example` to `secrets.env`
 next to `install-hermes.sh` and fill the values — same field names as the
@@ -34,4 +35,9 @@ wizard's encrypted `.hcfg` config.
 
 Never commit `install-config.json`, `secrets.env`, `*.hcfg`, or the rootfs
 to this repository. Encrypted configs are created locally with
-`config-tool/encrypt-config.bat` (drag & drop) and transferred separately.
+`config-tool/encrypt-config.ps1` (pure PowerShell - no WSL needed) and
+transferred separately:
+
+```powershell
+.\config-tool\encrypt-config.ps1 C:\path\install-config.json
+```

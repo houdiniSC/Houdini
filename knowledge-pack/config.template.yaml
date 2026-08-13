@@ -1,12 +1,13 @@
 # Hermes configuration template
-# The installer copies it to ~/.hermes/config.yaml and replaces
-# __DEEPSEEK_API_KEY__ with the key provided during installation.
+# The installer copies it to ~/.hermes/config.yaml and replaces the
+# __MODEL_ID__ / __MODEL_BASE_URL__ / __API_KEY__ placeholders with the
+# values chosen during installation (any OpenAI-compatible provider).
 
 model:
-  default: deepseek-v4-flash
+  default: __MODEL_ID__
   provider: custom
-  base_url: https://api.deepseek.com/v1
-  api_key: __DEEPSEEK_API_KEY__
+  base_url: __MODEL_BASE_URL__
+  api_key: __API_KEY__
 
 database:
   journal_mode: wal

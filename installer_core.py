@@ -71,7 +71,10 @@ SECRET_GROUPS = [
 ]
 
 SECRET_FIELDS = [
-    ("core", "deepseek", "DeepSeek API key", True, "env"),
+    ("core", "model_provider", "AI provider (deepseek/openai/opencode/custom)", False, "cfg"),
+    ("core", "model", "AI model ID (OpenAI-compatible)", False, "cfg"),
+    ("core", "model_base_url", "AI base URL (custom only)", False, "cfg"),
+    ("core", "api_key", "AI model API key (provider)", True, "env"),
     ("core", "bot", "Telegram bot token", True, "env"),
     ("core", "users", "Allowed Telegram user IDs (comma)", False, "env"),
     ("core", "home_channel", "Home group chat[:topic] (optional, auto on first run)", False, "home"),
@@ -93,6 +96,33 @@ SECRET_FIELDS = [
     ("search", "brave", "Brave Search API key", True, "env"),
     ("search", "serpapi", "SerpAPI key", True, "env"),
 ]
+
+MODEL_PROVIDERS = {
+    "deepseek": {
+        "label": "DeepSeek",
+        "base_url": "https://api.deepseek.com/v1",
+        "default_model": "deepseek-v4-flash",
+        "models": "deepseek-v4-flash / deepseek-v4-pro",
+    },
+    "openai": {
+        "label": "OpenAI",
+        "base_url": "https://api.openai.com/v1",
+        "default_model": "gpt-5.4",
+        "models": "gpt-5.4 / gpt-5.4-mini / gpt-5.4-nano",
+    },
+    "opencode": {
+        "label": "OpenCode",
+        "base_url": "https://opencode.ai/zen/v1",
+        "default_model": "deepseek-v4-flash",
+        "models": "deepseek-v4-flash / deepseek-v4-flash-free",
+    },
+    "custom": {
+        "label": "Custom (OpenAI-compatible)",
+        "base_url": "",
+        "default_model": "",
+        "models": "any OpenAI-compatible model ID",
+    },
+}
 
 SUDO_MODES = [
     ("restricted", "Restricted (recommended)", "openvpn, systemctl, apt, nmap, tcpdump, docker"),
@@ -259,7 +289,7 @@ def provision_keys(secrets: dict, on_log: Callable[[str], None] | None = None) -
 
     # 2) .env (dedupe: remove previous lines for the same keys)
     env_map = {
-        "deepseek": "DEEPSEEK_API_KEY",
+        "api_key": "OPENAI_API_KEY",
         "bot": "TELEGRAM_BOT_TOKEN",
         "users": "TELEGRAM_ALLOWED_USERS",
         "home_channel": "TELEGRAM_HOME_CHANNEL",
@@ -280,15 +310,30 @@ def provision_keys(secrets: dict, on_log: Callable[[str], None] | None = None) -
         os.chmod(env_file, 0o600)
         log(".env updated and locked (0600)")
 
-    # 3) config.yaml (model key + home channel)
-    if secrets.get("deepseek"):
+    # 3) config.yaml (model endpoint + home channel) - OpenAI-compatible
+    # provider presets; only the API key + model choice come from the user.
+    api_key = (secrets.get("api_key") or "").strip()
+    if api_key:
         tpl = HERMES_HOME / "config.template.yaml"
         if tpl.is_file():
-            text = tpl.read_text(encoding="utf-8").replace(
-                "__DEEPSEEK_API_KEY__", secrets["deepseek"]
-            )
-            (HERMES_HOME / "config.yaml").write_text(text, encoding="utf-8")
-            log("config.yaml written (model key injected)")
+            provider = (secrets.get("model_provider") or "deepseek").strip().lower()
+            preset = MODEL_PROVIDERS.get(provider, MODEL_PROVIDERS["custom"])
+            base_url = (secrets.get("model_base_url") or "").strip() or preset["base_url"]
+            model_id = (secrets.get("model") or "").strip() or preset["default_model"]
+            if base_url and model_id:
+                text = (
+                    tpl.read_text(encoding="utf-8")
+                    .replace("__MODEL_ID__", model_id)
+                    .replace("__MODEL_BASE_URL__", base_url)
+                    .replace("__API_KEY__", api_key)
+                )
+                (HERMES_HOME / "config.yaml").write_text(text, encoding="utf-8")
+                log(
+                    f"config.yaml written (model={model_id}, "
+                    f"provider={provider or 'custom'})"
+                )
+            else:
+                log("model config incomplete (base_url or model empty) - config.yaml skipped")
     hc = secrets.get("home_channel") or secrets.get("home_user")
     if hc and (HERMES_HOME / "config.yaml").is_file():
         chat, _, thread = hc.partition(":")

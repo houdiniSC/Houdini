@@ -43,6 +43,7 @@ from textual.widgets import (
 from installer_core import (
     HERMES_HOME,
     INSTALL_STEP_COUNT,
+    MODEL_PROVIDERS,
     SECRET_FIELDS,
     SECRET_GROUPS,
     SUDO_MODES,
@@ -94,7 +95,7 @@ STEP_DEFS = [
 STEP_HINTS = {
     "welcome": "Press Start to configure the isolated Hermes gateway.",
     "config": "Optional: paste a local path or an http(s) URL, then Load & Apply.",
-    "core": "Required: AI model key (DeepSeek). Bot token starts the gateway. Everything else can be added later.",
+    "core": "Required: pick an AI provider, choose the model and enter its API key. Bot token starts the gateway. Everything else can be added later.",
     "decide": "All tools install by default. Continue to customize, or Quick Install with defaults.",
     "tools": "Pick a tool category on the left; check the tools you want.",
     "secrets": "One key per service; empty fields are skipped and added later.",
@@ -163,16 +164,28 @@ class WizardScreen(Screen):
                         yield Static("", id="cfg_status")
                     with Vertical(id="step-core", classes="step"):
                         yield Static(
-                            "The AI model key is required — without it the agent "
-                            "cannot run.\nThe Telegram bot token is needed for the "
+                            "Pick an AI provider, choose the model and enter its "
+                            "API key.\nThe Telegram bot token is needed for the "
                             "gateway to start.\nEverything else (home channel, API "
                             "keys, tools) can be added or detected later.",
                             classes="hint",
                         )
+                        yield RadioSet(
+                            *[p["label"] for p in MODEL_PROVIDERS.values()],
+                            id="model_providers",
+                        )
                         yield Input(
-                            placeholder="DeepSeek API key (sk-...)",
+                            placeholder="Model ID (e.g. deepseek-v4-flash)",
+                            id="model",
+                        )
+                        yield Input(
+                            placeholder="API key (sk-...)",
                             password=True,
-                            id="deepseek",
+                            id="api_key",
+                        )
+                        yield Input(
+                            placeholder="Base URL (auto-filled for presets)",
+                            id="model_base_url",
                         )
                         yield Input(
                             placeholder="Telegram bot token (@BotFather)",
@@ -218,7 +231,13 @@ class WizardScreen(Screen):
                                 for group, glabel in SECRET_GROUPS:
                                     with Vertical(id=f"secret_pane_{group}", classes="pane"):
                                         for g2, fid, label, secret, _targets in SECRET_FIELDS:
-                                            if g2 == group and fid not in ("deepseek", "bot"):
+                                            if g2 == group and fid not in (
+                                                "model_provider",
+                                                "model",
+                                                "model_base_url",
+                                                "api_key",
+                                                "bot",
+                                            ):
                                                 yield Input(placeholder=label, password=secret, id=fid)
                     with Vertical(id="step-sudo", classes="step"):
                         yield Static(
@@ -307,6 +326,8 @@ class WizardScreen(Screen):
 
         mode_label = next(label for key, label, _d in SUDO_MODES if key == self.app.data["sudo_mode"])
         self._select_radio("sudo_modes", mode_label)
+        self._select_radio("model_providers", MODEL_PROVIDERS["deepseek"]["label"])
+        self._apply_model_preset("deepseek")
 
         await self._show("welcome")
 
@@ -482,11 +503,26 @@ class WizardScreen(Screen):
 
         secrets_cfg = cfg.get("secrets") or {}
         count = 0
+        core_inputs = {"model", "model_base_url", "api_key", "bot"}
         for _g, fid, _label, _secret, _targets in SECRET_FIELDS:
             val = str(secrets_cfg.get(fid, "") or "").strip()
             if val:
-                self.query_one(f"#{fid}", Input).value = val
-                count += 1
+                if fid == "model_provider":
+                    provider = val.lower()
+                    if provider in MODEL_PROVIDERS:
+                        self._select_radio(
+                            "model_providers",
+                            MODEL_PROVIDERS[provider]["label"],
+                        )
+                        self._apply_model_preset(provider)
+                elif fid in ("model", "model_base_url"):
+                    self.query_one(f"#{fid}", Input).value = val
+                elif fid in core_inputs:
+                    self.query_one(f"#{fid}", Input).value = val
+                    count += 1
+                else:
+                    self.query_one(f"#{fid}", Input).value = val
+                    count += 1
         self.app.data["secrets_count"] = count
 
         mode = cfg.get("sudo_mode")
@@ -526,6 +562,21 @@ class WizardScreen(Screen):
             except Exception:
                 continue
 
+    def _apply_model_preset(self, provider: str) -> None:
+        preset = MODEL_PROVIDERS.get(provider, MODEL_PROVIDERS["custom"])
+        model_input = self.query_one("#model", Input)
+        base_input = self.query_one("#model_base_url", Input)
+        defaults = {p["default_model"] for p in MODEL_PROVIDERS.values()}
+        current = model_input.value.strip()
+        if not current or current in defaults:
+            model_input.value = preset["default_model"]
+        model_input.placeholder = f"Model ID: {preset['models']}"
+        if provider == "custom":
+            base_input.placeholder = "Base URL (required for custom endpoints)"
+        else:
+            base_input.placeholder = "Base URL (auto-filled)"
+            base_input.value = preset["base_url"]
+
     # ------------------------------------------------------- data collect
     def _collect_tools(self) -> None:
         for name, _desc, _cat in TOOLS:
@@ -533,18 +584,37 @@ class WizardScreen(Screen):
 
     def _count_secrets(self) -> int:
         return sum(
-            1 for v in self.app.data.get("secrets", {}).values() if str(v or "").strip()
+            1
+            for k, v in self.app.data.get("secrets", {}).items()
+            if k not in ("model_provider", "model", "model_base_url")
+            and str(v or "").strip()
         )
 
     def _collect_core(self) -> None:
         secrets = self.app.data["secrets"]
-        secrets["deepseek"] = self.query_one("#deepseek", Input).value.strip()
+        rs = self.query_one("#model_providers", RadioSet)
+        provider = "deepseek"
+        for rb in rs.query(RadioButton):
+            if rb.value and rb.label is not None:
+                lbl = rb.label.plain
+                provider = next(
+                    (k for k, p in MODEL_PROVIDERS.items() if p["label"] == lbl),
+                    "custom",
+                )
+                break
+        self._apply_model_preset(provider)
+        secrets["model_provider"] = provider
+        secrets["model"] = self.query_one("#model", Input).value.strip()
+        secrets["model_base_url"] = self.query_one(
+            "#model_base_url", Input
+        ).value.strip()
+        secrets["api_key"] = self.query_one("#api_key", Input).value.strip()
         secrets["bot"] = self.query_one("#bot", Input).value.strip()
         self.app.data["secrets_count"] = self._count_secrets()
 
     def _collect_secrets(self) -> None:
         for _group, fid, _label, _secret, _targets in SECRET_FIELDS:
-            if fid in ("deepseek", "bot"):
+            if fid in ("model_provider", "model", "model_base_url", "api_key", "bot"):
                 continue
             self.app.data["secrets"][fid] = self.query_one(f"#{fid}", Input).value.strip()
         self.app.data["secrets_count"] = self._count_secrets()
@@ -592,6 +662,12 @@ class WizardScreen(Screen):
                         f"[b]Effect:[/] {detail}"
                     )
                     break
+        elif rid == "model_providers":
+            provider = next(
+                (k for k, p in MODEL_PROVIDERS.items() if p["label"] == value),
+                "custom",
+            )
+            self._apply_model_preset(provider)
 
     # ------------------------------------------------------------ review
     def _fill_review(self) -> None:
@@ -606,6 +682,13 @@ class WizardScreen(Screen):
         table.add_columns("Item", "Value")
         table.add_row("Tools", f"{len(selected)} - {', '.join(selected) if selected else 'none'}")
         table.add_row("Secrets provided", str(data.get("secrets_count", 0)))
+        provider = data.get("secrets", {}).get("model_provider", "deepseek")
+        model = data.get("secrets", {}).get("model", "")
+        table.add_row(
+            "AI model",
+            f"{MODEL_PROVIDERS.get(provider, MODEL_PROVIDERS['custom'])['label']} / "
+            f"{model or 'not set'}",
+        )
         table.add_row("Sudo mode", mode_label)
         table.add_row("Personality", "set at first conversation (agent name + style)")
         webui = data.get("webui", True)
@@ -669,6 +752,13 @@ class WizardScreen(Screen):
         log.write("")
         log.write(f"[{SLATE}]Sudo mode:[/] {mode_label}")
         log.write(f"[{SLATE}]Secrets provided:[/] {data.get('secrets_count', 0)}")
+        provider = data.get("secrets", {}).get("model_provider", "deepseek")
+        model = data.get("secrets", {}).get("model", "")
+        log.write(
+            f"[{SLATE}]AI model:[/] "
+            f"{MODEL_PROVIDERS.get(provider, MODEL_PROVIDERS['custom'])['label']} / "
+            f"{model or 'not set'}"
+        )
         log.write(f"[{SLATE}]Personality:[/] asked at first conversation (name + style)")
         log.write(
             f"[{SLATE}]Local memory:[/] "
@@ -819,11 +909,20 @@ async def selftest() -> None:
             assert app.screen is not None
             await press("next")  # welcome -> config
             await press("next")  # config (skip) -> core
-            app.screen.query_one("#deepseek", Input).value = "sk-demo-value"
+            app.screen.query_one("#api_key", Input).value = "sk-demo-value"
             app.screen.query_one("#bot", Input).value = "123:demo-token"
+            rs = app.screen.query_one("#model_providers", RadioSet)
+            for rb in rs.query(RadioButton):
+                if rb.label is not None and rb.label.plain == "OpenCode":
+                    rb.value = True
+                    break
+            await pilot.pause()
             await press("next")  # core -> decide
             assert app.screen.query_one("#decide_custom", Button) is not None
             assert app.screen.query_one("#decide_quick", Button) is not None
+            assert app.data["secrets"]["model_provider"] == "opencode"
+            assert app.data["secrets"]["model"] == "deepseek-v4-flash"
+            assert app.data["secrets"]["model_base_url"] == "https://opencode.ai/zen/v1"
             app.screen.query_one("#decide_custom", Button).press()
             await pilot.pause()
             cats = app.screen.query_one("#tool_cats", OptionList)
@@ -865,13 +964,14 @@ async def selftest() -> None:
         await pilot2.pause()
         await press2("next")  # welcome -> config
         await press2("next")  # config (skip) -> core
-        app2.screen.query_one("#deepseek", Input).value = "sk-demo"
+        app2.screen.query_one("#api_key", Input).value = "sk-demo"
         await press2("next")  # core -> decide
         app2.screen.query_one("#decide_quick", Button).press()
         await pilot2.pause()
         assert app2.screen.query_one("#review_table", DataTable) is not None
         assert all(app2.data["tools"][n] for n, _d, _c in TOOLS)
-        assert app2.data["secrets"]["deepseek"] == "sk-demo"
+        assert app2.data["secrets"]["api_key"] == "sk-demo"
+        assert app2.data["secrets"]["model_provider"] == "deepseek"
         assert app2.data["secrets_count"] == 1
     print("selftest OK")
 
