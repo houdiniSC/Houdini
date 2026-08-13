@@ -846,13 +846,35 @@ class LiveInstaller:
                     self.on_log(
                         "skills_mode 'full' accepted — installing the bundled CyberStrike library"
                     )
-                shutil.copytree(
-                    src_skills,
-                    HERMES_HOME / "skills",
-                    dirs_exist_ok=True,
-                )
+                # Operational skills (lean) -> ~/.hermes/skills. Hermes
+                # registers every SKILL.md there as a slash command, so the
+                # 7k+ cyberstrike library MUST NOT live here (it blows up the
+                # first-conversation context). It goes to ~/.hermes/knowledge.
+                skills_dest = HERMES_HOME / "skills"
+                skills_dest.mkdir(parents=True, exist_ok=True)
+                for entry in src_skills.iterdir():
+                    if entry.name == "cyberstrike":
+                        continue
+                    if entry.is_dir():
+                        shutil.copytree(
+                            entry, skills_dest / entry.name, dirs_exist_ok=True
+                        )
+                    else:
+                        shutil.copy2(entry, skills_dest / entry.name)
+                lib_src = src_skills / "cyberstrike"
+                if lib_src.is_dir():
+                    shutil.copytree(
+                        lib_src,
+                        HERMES_HOME / "knowledge" / "cyberstrike",
+                        dirs_exist_ok=True,
+                    )
+                    self.on_log(
+                        "cyberstrike library -> ~/.hermes/knowledge/cyberstrike "
+                        "(not registered as commands; opened on demand)"
+                    )
                 self.on_log(
-                    "skills: custom + CyberStrike library (index-only, loaded on demand — no token cost)"
+                    "skills: operational skills registered; CyberStrike library "
+                    "on demand — no context cost"
                 )
             src_toolkit = PACK_DIR / "toolkit"
             if src_toolkit.is_dir():
@@ -861,7 +883,8 @@ class LiveInstaller:
             # scripts (e.g. toolkit-scan.sh). Normalize .sh files in the distro.
             await self._sh(
                 f"find {shlex.quote(str(HERMES_HOME / 'toolkit'))} "
-                f"{shlex.quote(str(HERMES_HOME / 'skills'))} -name '*.sh' "
+                f"{shlex.quote(str(HERMES_HOME / 'skills'))} "
+                f"{shlex.quote(str(HERMES_HOME / 'knowledge'))} -name '*.sh' "
                 "-exec sed -i 's/\\r$//' {} +"
             )
             idx = HERMES_HOME / "toolkit" / "tools" / "build-skills-index.py"

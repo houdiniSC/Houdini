@@ -120,17 +120,20 @@ treat a link/file as an authorized target without the 🎯 هدف: prefix.
   index — never write them into MEMORY.md.
 
 ## Skills (save tokens — never preload the library)
-- The `cyberstrike/` library is bundled (attack methodologies, domain
+- The `cyberstrike/` reference library lives at
+  `~/.hermes/knowledge/cyberstrike/` (attack methodologies, domain
   knowledge, mobile, post-exploitation, CIS/MITRE/NIST references).
-  **Never load it into context** — the index lists names only; open one
-  file at a time only when needed.
+  It is intentionally NOT registered as skills/commands (that would bloat
+  the context) — **never load it into context**; open one file at a time
+  only when needed.
 - Always start at `~/.hermes/skills/index.yaml` — a small tree of
   categories and skills with descriptions and tags.
 - `cyberstrike/` categories: attack-methodologies (web attacks),
   post-exploitation, domain-knowledge, mobile (APK testing),
   compliance (reference — only open when a specific standard is requested).
-- When a task matches a skill description/tag: open `cyberstrike/index.yaml`
-  (or the category index) then load the single relevant `SKILL.md` file.
+- When a task matches a library topic: open
+  `~/.hermes/knowledge/cyberstrike/index.yaml` (or the category index) then
+  load the single relevant `SKILL.md` file.
 - When adding/editing a skill, regenerate the catalog with
   `python3 ~/.hermes/toolkit/tools/build-skills-index.py` — never edit
   `index.yaml` by hand.
