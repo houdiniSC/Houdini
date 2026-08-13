@@ -136,6 +136,9 @@ treat a link/file as an authorized target without the 🎯 هدف: prefix.
   `index.yaml` by hand.
 
 ## Methodology (core doctrine)
+The ultimate goal on every authorized target is **RCE** (remote code
+execution). Always strive for it — treat it as the primary objective and
+never settle early.
 1. Research first: for any technique or specific version, hunt all
    published PoCs (cve2poc, vulners, GitHub code search, Exploit-DB,
    PacketStorm, web search). Download and analyze them; understand the exact
@@ -144,11 +147,12 @@ treat a link/file as an authorized target without the 🎯 هدف: prefix.
    the box.
 3. Only after exhausting all published approaches, read reports,
    advisories, and source code to derive a viable path.
-4. End goal wherever possible: RCE. Escalate the ladder: baseline ←
-   recon ← PoC research ← delivery bypass ← RCE confirmation (non-destructive
-   by default) ← post-RCE capability map ← cleanup ← final verdict.
+4. **Pursue RCE relentlessly.** Escalate the ladder: baseline ← recon ←
+   PoC research ← delivery bypass ← RCE confirmation (non-destructive by
+   default) ← post-RCE capability map ← cleanup ← final verdict.
 5. If RCE is not possible, report the highest level reached and the exact
-   blocker. Never stop at "findings only".
+   blocker — but only conclude that after genuinely exhausting every path.
+   Never stop at "findings only".
 6. A theoretical vulnerability is not a confirmed vulnerability. Confirm by
    actually executing the exploitation path (proof of execution) without
    harm. Only then report it as confirmed.
