@@ -325,6 +325,9 @@ irm `"`$src\install-wsl.ps1`" | iex"
     # Default when the distro is already present: never re-import. Instead,
     # copy the fresh package (src/, knowledge-pack/) into the distro and run
     # the updated TUI from there -- no unregister, no reinstall, no download.
+    # NOTE: knowledge-pack has thousands of small files; copying them one by
+    # one through the 9p/DrvFs mount is extremely slow. A tar pipe (Windows
+    # side tar -> wsl tar) streams them at native speed.
     $rootfsCached = (Test-Path (Join-Path $env:TEMP "hermes-rootfs.tar.gz")) -or
                     ($RootfsPath -and (Test-Path $RootfsPath))
     $Update = $true
@@ -338,11 +341,40 @@ irm `"`$src\install-wsl.ps1`" | iex"
         $wslDrive = $InstallerDir.Substring(0, 1).ToLowerInvariant()
         $wslRest = $InstallerDir.Substring(2).Replace("\", "/")
         $wslPkg = "/mnt/$wslDrive$wslRest"
-        Log "Syncing package into '$Distro' ($guestDir) ..."
-        wsl -d $Distro -u hermes -- bash -lc "mkdir -p '$guestDir' && rsync -a --delete '$wslPkg/src/' '$guestDir/src/' 2>/dev/null || cp -a '$wslPkg/src' '$guestDir/' ; mkdir -p '$guestDir/knowledge-pack' && cp -a '$wslPkg/knowledge-pack/.' '$guestDir/knowledge-pack/' 2>/dev/null ; cp -f '$wslPkg/install-ubuntu.sh' '$guestDir/' 2>/dev/null || true"
-        if ($LASTEXITCODE -ne 0) {
-            Log "WARNING: package sync reported an error -- continuing with the mounted path."
+        Log "Syncing package into '$Distro' ($guestDir) -- this may take a minute for the knowledge pack..."
+        # tar bundle: Windows tar (bsdtar) archives src + knowledge-pack into
+        # ONE file, which is copied across 9p as a single large stream, then
+        # unpacked natively on the ext4 filesystem. Copying thousands of small
+        # files one by one through the DrvFs mount would take many minutes.
+        $tarName = "houdini-pkg.tar"
+        $tarOut = Join-Path $env:TEMP $tarName
+        $wslTar = "/mnt/" + $tarOut.Substring(0, 1).ToLowerInvariant() +
+                  $tarOut.Substring(2).Replace("\", "/")
+        if (Test-Path $tarOut) { Remove-Item -LiteralPath $tarOut -Force }
+        try {
+            # Git for Windows puts its own tar on PATH; the Windows (bsdtar)
+            # binary must be called by absolute path so paths like C:\ work.
+            $tarBin = "C:\Windows\System32\tar.exe"
+            if (-not (Test-Path $tarBin)) { $tarBin = "tar.exe" }
+            & $tarBin -C $InstallerDir -cf $tarOut src knowledge-pack install-ubuntu.sh 2>$null
+            if ($LASTEXITCODE -eq 0 -and (Test-Path $tarOut)) {
+                Log "Bundle ready ($([math]::Round((Get-Item $tarOut).Length / 1MB, 1)) MB) -- unpacking inside distro..."
+                # No stdin redirect: PowerShell can't do `< file`. The tar sits
+                # in %TEMP% and is read from the distro via /mnt/c/... as a
+                # single file, then extracted locally on ext4.
+                wsl -d $Distro -u root -- bash -lc "mkdir -p '$guestDir' && tar -C '$guestDir' -xf '$wslTar'"
+                if ($LASTEXITCODE -ne 0) {
+                    Log "WARNING: tar unpack reported an error -- continuing with the mounted path."
+                }
+            } else {
+                Log "WARNING: tar bundle failed -- falling back to mounted path."
+            }
+        } catch {
+            Log "WARNING: package sync failed ($($_.Exception.Message)) -- continuing with the mounted path."
         }
+        Remove-Item -LiteralPath $tarOut -Force -ErrorAction SilentlyContinue
+        # ensure the guest copy has the latest files regardless of method
+        wsl -d $Distro -u root -- bash -lc "chown -R hermes:hermes '$guestDir' 2>/dev/null; chmod +x '$guestDir/install-ubuntu.sh' 2>/dev/null || true"
     }
 
     # ---- 3) Inside setup: systemd + agent user + deps --------------------
