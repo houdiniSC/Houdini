@@ -175,9 +175,15 @@ irm `"`$src\install-wsl.ps1`" | iex"
 
     $existing = wsl --list --quiet 2>$null | Where-Object { $_ -match [regex]::Escape($Distro) }
     # wsl --list output can be UTF-16 with null bytes on some Windows builds;
-    # fall back to wsl -l -v parsing if the quiet list looks empty.
+    # strip NUL bytes and fall back to wsl -l -v parsing if the list is empty.
     if (-not $existing) {
-        $verboseList = wsl --list --verbose 2>$null | Out-String
+        $quietRaw = (& wsl.exe --list --quiet 2>$null | Out-String) -replace "`0", ""
+        if ($quietRaw -match [regex]::Escape($Distro)) {
+            $existing = $Distro
+        }
+    }
+    if (-not $existing) {
+        $verboseList = (& wsl.exe --list --verbose 2>$null | Out-String) -replace "`0", ""
         if ($verboseList -match [regex]::Escape($Distro)) {
             $existing = $Distro
         }
@@ -302,7 +308,16 @@ irm `"`$src\install-wsl.ps1`" | iex"
         Log "Importing '$Distro' from $rootfs"
         wsl --import $Distro $installDir $rootfs
         if ($LASTEXITCODE -ne 0) {
-            Fail "wsl --import failed."
+            # Safety net: the distro check above can miss a registered distro
+            # (UTF-16 output, name casing). If import says it already exists,
+            # treat this as an update run instead of failing.
+            $errText = (& wsl.exe --list --verbose 2>&1 | Out-String) -replace "`0", ""
+            if ($errText -match [regex]::Escape($Distro)) {
+                Log "Import reported the distro already exists -- switching to UPDATE mode."
+                $existing = $Distro
+            } else {
+                Fail "wsl --import failed. Check the error above and that '$rootfs' is a valid rootfs."
+            }
         }
     }
 
