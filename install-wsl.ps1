@@ -375,6 +375,10 @@ fi
 if [ ! -x /home/hermes/hermes-venv/bin/python ]; then
     python3 -m venv /home/hermes/hermes-venv
 fi
+# Weak links drop git fetches mid-clone ("curl 56 Connection died").
+# HTTP/1.1 + a big post buffer make clones survive flaky connections.
+git config --global http.version HTTP/1.1 || true
+git config --global http.postBuffer 524288000 || true
 /home/hermes/hermes-venv/bin/pip install -q textual cryptography 2>/dev/null || true
 loginctl enable-linger hermes 2>/dev/null || true
 '@

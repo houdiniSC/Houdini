@@ -651,12 +651,25 @@ class LiveInstaller:
             # version: use whatever Python this system already has (Ubuntu
             # 24.04 -> 3.12, 25.04 -> 3.14, ...). uv python find <that>
             # resolves locally - no python-build-standalone tarball download.
+            #
+            # Flaky networks drop PyPI/GitHub connections mid-fetch; retry
+            # the whole installer a few times before declaring failure.
             _py_ver = f"{sys.version_info.major}.{sys.version_info.minor}"
-            return await self._sh(
-                "curl -fsSL https://hermes-agent.nousresearch.com/install.sh "
-                f"| sed 's/^PYTHON_VERSION=\"3.11\"/PYTHON_VERSION=\"{_py_ver}\"/' "
-                "| bash -s -- --non-interactive --skip-setup"
-            )
+            for attempt in (1, 2, 3):
+                ok = await self._sh(
+                    "curl -fsSL https://hermes-agent.nousresearch.com/install.sh "
+                    f"| sed 's/^PYTHON_VERSION=\"3.11\"/PYTHON_VERSION=\"{_py_ver}\"/' "
+                    "| bash -s -- --non-interactive --skip-setup"
+                )
+                if ok:
+                    return True
+                if tool_path("hermes"):
+                    self.on_log("Hermes install retry succeeded via leftover artifacts")
+                    return True
+                if attempt < 3:
+                    self.on_log(f"attempt {attempt} failed — retrying in 10s...")
+                    await asyncio.sleep(10)
+            return False
 
         if key == "apt":
             selected = [APT_TOOLS[t] for t in APT_TOOLS if tools.get(t)]
@@ -710,10 +723,18 @@ class LiveInstaller:
                 ok = await self._sh(
                     "sudo python3 -m pip install --break-system-packages -q 'setuptools<81'"
                 ) and ok
-                ok = await self._sh(
-                    "sudo python3 -m pip install --break-system-packages -q "
-                    "--no-build-isolation git+https://github.com/immunIT/drupwn"
-                ) and ok
+                # drupwn has no PyPI release - git+https is its documented
+                # install path. Weak links drop the clone mid-fetch, so retry.
+                for attempt in (1, 2, 3):
+                    if await self._sh(
+                        "sudo python3 -m pip install --break-system-packages -q "
+                        "--no-build-isolation git+https://github.com/immunIT/drupwn"
+                    ):
+                        break
+                    ok = False
+                    if attempt < 3:
+                        self.on_log(f"drupwn clone failed — retrying in 8s...")
+                        await asyncio.sleep(8)
             return ok
 
         if key == "wpscan":
@@ -749,13 +770,23 @@ class LiveInstaller:
             pw_ver = ""
             hermes_py = HERMES_HOME / "hermes-agent" / "venv" / "bin" / "python"
             if hermes_py.is_file():
-                pw_ver = (
+                raw = (
                     await self._sh_out(
                         f"{shlex.quote(str(hermes_py))} -c "
                         "'import importlib.metadata; "
-                        "print(importlib.metadata.version(\"playwright\"))'"
+                        "print(importlib.metadata.version(\"playwright\"))' "
+                        "2>/dev/null || true"
                     )
                 ).strip()
+                # Only accept a real version string - _sh_out returns the
+                # last output line which may be a PackageNotFoundError
+                # traceback line when playwright isn't in the Hermes venv.
+                if re.fullmatch(r"[0-9]+(?:\.[0-9]+)+", raw):
+                    pw_ver = raw
+                else:
+                    self.on_log(
+                        "playwright not in Hermes venv — installing latest"
+                    )
             pw_spec = f"playwright=={pw_ver}" if pw_ver else "playwright"
             ok = await self._sh(
                 f"python3 -m venv {venv} && "

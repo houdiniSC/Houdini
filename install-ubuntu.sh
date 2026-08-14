@@ -103,6 +103,10 @@ done
 
 # root (e.g. bare SSH server) may not have sudo installed - empty prefix
 if [ "$(id -u)" = 0 ]; then SUDO=""; else SUDO="sudo"; fi
+# Weak links drop git fetches mid-clone ("curl 56 Connection died").
+# HTTP/1.1 + a big post buffer make clones survive flaky connections.
+git config --global http.version HTTP/1.1 2>/dev/null || true
+git config --global http.postBuffer 524288000 2>/dev/null || true
 
 # ── 0) UI: prefer the shared Textual TUI (same professional wizard as the
 # WSL install), also over SSH. The whiptail flow below is only a fallback
