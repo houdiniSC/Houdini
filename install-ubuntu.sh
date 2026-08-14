@@ -76,7 +76,14 @@ ui_radio() { # ui_radio <title> <prompt> <items...> -> prints selection
   fi
 }
 
-get_env() { grep -E "^$1=" "$SECRETS_FILE" 2>/dev/null | head -1 | cut -d= -f2-; }
+# Secrets come from environment variables first (no file needed):
+#   api_key=sk-... bot=123:token ./install-ubuntu.sh
+# or export them before running. Falls back to config/secrets.env.
+get_env() {
+  local v
+  v="$(printenv "$1" 2>/dev/null)" && { printf '%s' "$v"; return; }
+  grep -E "^$1=" "$SECRETS_FILE" 2>/dev/null | head -1 | cut -d= -f2-
+}
 
 # ── Welcome ───────────────────────────────────────────────────────────────
 ui_box "Welcome" 14 68 "
