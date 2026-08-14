@@ -379,6 +379,13 @@ fi
 # HTTP/1.1 + a big post buffer make clones survive flaky connections.
 git config --global http.version HTTP/1.1 || true
 git config --global http.postBuffer 524288000 || true
+# WSL has NO IPv6 route, yet pypi.org resolves to IPv6-first AAAA records.
+# Unordered fallback makes pip/uv/git stall on dead IPv6 (random timeouts).
+# Prefer IPv4-mapped addresses so connections never touch broken IPv6.
+grep -q '^precedence ::ffff:0:0/96' /etc/gai.conf 2>/dev/null || {
+    sed -i 's|^#precedence ::ffff:0:0/96.*|precedence ::ffff:0:0/96  100|' /etc/gai.conf 2>/dev/null || true
+    grep -q '^precedence ::ffff:0:0/96' /etc/gai.conf 2>/dev/null || printf 'precedence ::ffff:0:0/96  100\n' >> /etc/gai.conf
+}
 /home/hermes/hermes-venv/bin/pip install -q textual cryptography 2>/dev/null || true
 loginctl enable-linger hermes 2>/dev/null || true
 '@
