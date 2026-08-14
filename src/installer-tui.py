@@ -16,6 +16,7 @@ Usage:
 from __future__ import annotations
 
 import asyncio
+import os
 import sys
 
 from textual.app import App, ComposeResult
@@ -1316,7 +1317,23 @@ async def selftest() -> None:
 
 
 if __name__ == "__main__":
+    def _fix_terminal_size() -> None:
+        """Some SSH layers (WSL->ssh, web consoles) report a bogus window
+        size (e.g. 131072x1) - Textual then renders nothing while still
+        reading keys (the 'hangs but Ctrl+Q works' symptom). Force sane
+        COLUMNS/LINES env overrides when the reported size is impossible."""
+        import shutil
+
+        try:
+            cols, rows = shutil.get_terminal_size()
+        except Exception:
+            cols, rows = 80, 24
+        if rows < 5 or cols < 20 or cols > 2000 or rows > 500:
+            os.environ["COLUMNS"] = str(max(80, min(cols, 120)))
+            os.environ["LINES"] = str(max(24, min(rows, 40)))
+
     def main() -> None:
+        _fix_terminal_size()
         HoudiniInstaller().run()
 
     if "--selftest" in sys.argv:
