@@ -1079,6 +1079,26 @@ class LiveInstaller:
                     self.on_log("hermes-webui clone failed")
                     return False
             env = {"HERMES_WEBUI_HOST": host, "HERMES_WEBUI_PORT": port}
+            # Port isolation: a stale WebUI process from a previous install
+            # may still hold the port. Kill anything listening on it first,
+            # then fall back to the next free port if a foreign app owns it.
+            await self._sh(
+                f"fuser -k {port}/tcp 2>/dev/null; sleep 1; true"
+            )
+            for attempt in range(5):
+                probe = await self._sh(
+                    f"(ss -tln 2>/dev/null || netstat -tln 2>/dev/null) "
+                    f"| grep -q ':{port} '"
+                )
+                if not probe:
+                    break
+                self.on_log(
+                    f"port {port} busy — trying {int(port) + 1}"
+                )
+                port = str(int(port) + 1)
+                env["HERMES_WEBUI_PORT"] = port
+            # keep the summary in sync with the port that actually launched
+            self.data["webui_port"] = port
             self.on_log(
                 "starting WebUI daemon (first run builds a venv — may take a minute)..."
             )
