@@ -788,8 +788,27 @@ class LiveInstaller:
                         "playwright not in Hermes venv — installing latest"
                     )
             pw_spec = f"playwright=={pw_ver}" if pw_ver else "playwright"
-            ok = await self._sh(
-                f"python3 -m venv {venv} && "
+            # Minimal cloud images: venv creation "succeeds" but yields no
+            # pip (ensurepip missing) AND apt lists are empty until the first
+            # `apt-get update`. Verify pip, then install pkgs and recreate.
+            venv_ok = False
+            for _attempt in range(2):
+                if (
+                    await self._sh(f"python3 -m venv {venv}")
+                    and (venv / "bin" / "pip").is_file()
+                ):
+                    venv_ok = True
+                    break
+                self.on_log(
+                    "venv has no pip — installing python3-venv (apt update first)..."
+                )
+                if not await self._sh(
+                    "sudo apt-get update -qq && "
+                    "sudo apt-get install -y -qq python3-venv python3-pip"
+                ):
+                    break
+                await self._sh(f"rm -rf {venv}")
+            ok = venv_ok and await self._sh(
                 f"{py} -m pip install -q mitmproxy {pw_spec}"
             )
             if ok:

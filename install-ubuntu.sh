@@ -112,26 +112,54 @@ git config --global http.postBuffer 524288000 2>/dev/null || true
 # WSL install), also over SSH. The whiptail flow below is only a fallback
 # for machines where the TUI cannot start (no python3 / pip blocked).
 # HOUDINI_NO_TUI=1 forces the classic whiptail wizard.
+
+# Minimal cloud images (Hetzner, DO, ...) ship python3 WITHOUT ensurepip/
+# python3-venv, and their apt lists are empty until the first
+# `apt-get update` — so a plain "apt-get install python3-venv" fails with
+# "E: Package 'python3-venv' has no installation candidate". ensure_venv_pkgs()
+# runs update first and resolves the versioned package name (python3-venv,
+# falling back to python3.X-venv). ensurepip + pip arrive together in that
+# one package.
+ensure_venv_pkgs() { # -> 0 ok / 1 fail
+  local pymj pkg candidate
+  $SUDO apt-get update -qq >> "$LOG" 2>&1 || return 1
+  pymj="$(python3 -c 'import sys; print(f"{sys.version_info.major}.{sys.version_info.minor}")' 2>/dev/null)"
+  pkg="python3-venv"
+  candidate="$(apt-cache policy "$pkg" 2>/dev/null | awk '/^  Candidate:/{print $2}')"
+  if [ -z "$candidate" ] || [ "$candidate" = "(none)" ]; then
+    pkg="python${pymj}-venv"
+  fi
+  $SUDO apt-get install -y -qq python3 "$pkg" python3-pip >> "$LOG" 2>&1 \
+    || $SUDO apt-get install -y -qq python3 "$pkg" >> "$LOG" 2>&1 || return 1
+}
+
+# make_venv <path> -> 0 ok / 1 fail. Creates the venv AND verifies pip is
+# present; on minimal images the first creation "succeeds" but yields a venv
+# with no pip (ensurepip missing), so install the venv packages and recreate.
+make_venv() {
+  local venv=$1
+  if python3 -m venv "$venv" >> "$LOG" 2>&1 && [ -x "$venv/bin/pip" ]; then
+    return 0
+  fi
+  ensure_venv_pkgs || return 1
+  rm -rf "$venv"
+  python3 -m venv "$venv" >> "$LOG" 2>&1 && [ -x "$venv/bin/pip" ]
+}
+
 TUI_FAILED=0
 TUI_ERR=""
 if [ "${HOUDINI_NO_TUI:-0}" != "1" ] && [ -f "$SCRIPT_DIR/src/installer-tui.py" ]; then
   TUI_VENV="$HOME/.houdini-tui-venv"
-  if [ ! -x "$TUI_VENV/bin/python" ]; then
-    command -v python3 >/dev/null 2>&1 || $SUDO apt-get install -y -qq python3 python3-venv python3-pip >> "$LOG" 2>&1
-    python3 -m venv "$TUI_VENV" >> "$LOG" 2>&1 || {
-      # minimal Ubuntu images ship python3 without python3-venv - install and
-      # retry once before giving up
-      TUI_ERR=$(tail -n 3 "$LOG" | tr '\n' ' ')
-      $SUDO apt-get install -y -qq python3-venv python3-pip >> "$LOG" 2>&1
-      python3 -m venv "$TUI_VENV" >> "$LOG" 2>&1 || { TUI_FAILED=1; TUI_ERR=$(tail -n 3 "$LOG" | tr '\n' ' '); }
-    }
+  if [ ! -x "$TUI_VENV/bin/python" ] && ! make_venv "$TUI_VENV"; then
+    TUI_FAILED=1
+    TUI_ERR=$(tail -n 3 "$LOG" | tr '\n' ' ')
   fi
-  # venv created without pip on minimal images (ensurepip missing) - fix it
+  # venv exists but has no pip (created earlier while ensurepip was missing)
   if [ "$TUI_FAILED" = 0 ] && [ ! -x "$TUI_VENV/bin/pip" ]; then
-    TUI_ERR="venv has no pip (ensurepip missing)"
-    $SUDO apt-get install -y -qq python3-venv python3-pip >> "$LOG" 2>&1
-    rm -rf "$TUI_VENV"
-    python3 -m venv "$TUI_VENV" >> "$LOG" 2>&1 || { TUI_FAILED=1; TUI_ERR=$(tail -n 3 "$LOG" | tr '\n' ' '); }
+    if ! make_venv "$TUI_VENV"; then
+      TUI_FAILED=1
+      TUI_ERR=$(tail -n 3 "$LOG" | tr '\n' ' ')
+    fi
   fi
   if [ "$TUI_FAILED" = 0 ]; then
     "$TUI_VENV/bin/pip" install -q textual cryptography >> "$LOG" 2>&1 \
@@ -197,6 +225,8 @@ command -v ngrok >/dev/null 2>&1 || {
 export PATH="$HERMES_HOME/bin:$PATH"
 command -v droopescan >/dev/null 2>&1 || {
   ui_info "Tools" "Installing droopescan + drupwn (pip)..."
+  # minimal images have no pip on the system python either
+  $SUDO python3 -m pip --version >> "$LOG" 2>&1 || ensure_venv_pkgs || true
   $SUDO python3 -m pip install --break-system-packages droopescan >> "$LOG" 2>&1
   $SUDO python3 -m pip install --break-system-packages 'setuptools<81' >> "$LOG" 2>&1
   $SUDO python3 -m pip install --break-system-packages --no-build-isolation git+https://github.com/immunIT/drupwn >> "$LOG" 2>&1
@@ -230,14 +260,17 @@ fi
 # browser-capture: Playwright + mitmproxy + Chromium (optional, large)
 if ask_tool "Browser Capture" "Install browser-capture (Playwright + Chromium + mitmproxy, ~200MB)?"; then
   ui_info "Tools" "Installing browser-capture (playwright + mitmproxy)..."
-  python3 -m venv "$HOME/browser-venv"
-  "$HOME/browser-venv/bin/pip" install -q playwright mitmproxy >> "$LOG" 2>&1
-  $SUDO "$HOME/browser-venv/bin/playwright" install --with-deps chromium >> "$LOG" 2>&1
-  printf '#!/usr/bin/env bash\nexec %s %s "$@"\n' \
-    "$HOME/browser-venv/bin/python" "$HERMES_HOME/toolkit/tools/browser-capture.py" \
-    | $SUDO tee /usr/local/bin/browser-capture >/dev/null
-  $SUDO chmod +x /usr/local/bin/browser-capture
-  ui_info "Tools" "browser-capture ready"
+  if make_venv "$HOME/browser-venv"; then
+    "$HOME/browser-venv/bin/pip" install -q playwright mitmproxy >> "$LOG" 2>&1
+    $SUDO "$HOME/browser-venv/bin/playwright" install --with-deps chromium >> "$LOG" 2>&1
+    printf '#!/usr/bin/env bash\nexec %s %s "$@"\n' \
+      "$HOME/browser-venv/bin/python" "$HERMES_HOME/toolkit/tools/browser-capture.py" \
+      | $SUDO tee /usr/local/bin/browser-capture >/dev/null
+    $SUDO chmod +x /usr/local/bin/browser-capture
+    ui_info "Tools" "browser-capture ready"
+  else
+    ui_box "Browser Capture" 8 60 "✗ Could not create the Python venv — skipped browser-capture (see $LOG)"
+  fi
 fi
 
 # mobile toolchain: apktool + jadx + frida (APK testing)
@@ -256,6 +289,7 @@ if ask_tool "Mobile Tools" "Install APK tools (apktool + jadx + frida/objection)
     $SUDO chmod +x /opt/jadx/bin/jadx
     $SUDO ln -sf /opt/jadx/bin/jadx /usr/local/bin/jadx
   }
+  $SUDO python3 -m pip --version >> "$LOG" 2>&1 || ensure_venv_pkgs || true
   $SUDO python3 -m pip install --break-system-packages -q frida-tools objection >> "$LOG" 2>&1
   ui_info "Tools" "Mobile tools ready"
 fi
