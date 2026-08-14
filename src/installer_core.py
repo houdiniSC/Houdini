@@ -733,6 +733,16 @@ class LiveInstaller:
                 await self._sh(
                     "sudo python3 -m pip install --break-system-packages -q droopescan"
                 )
+                if not tool_path("droopescan"):
+                    # droopescan 1.45.1 (last release 2021) is broken on
+                    # Python 3.12+: its legacy cement framework fails at
+                    # import and pip generates no console script. It is
+                    # best-effort only - drupwn + nuclei Drupal templates
+                    # cover the same ground.
+                    self.on_log(
+                        "! droopescan unavailable (legacy cement framework "
+                        "breaks on modern Python) — drupwn + nuclei cover Drupal"
+                    )
             if tools.get("drupwn") and not tool_path("drupwn"):
                 # drupwn (last release 2019) requires prompt_toolkit<=2.0.7
                 # while frida-tools needs 3.x - one environment can never
@@ -758,12 +768,10 @@ class LiveInstaller:
                         f"printf '%s' {shlex.quote(launcher)} | sudo tee /usr/local/bin/drupwn >/dev/null "
                         "&& sudo chmod +x /usr/local/bin/drupwn"
                     )
-            missing = [
-                t for t in ("droopescan", "drupwn")
-                if tools.get(t) and not tool_path(t)
-            ]
-            if missing:
-                self.on_log(f"drupal tools still missing: {', '.join(missing)}")
+            # drupwn is the hard requirement; droopescan is best-effort only
+            # (its 2021 code base is broken on modern Python interpreters).
+            if tools.get("drupwn") and not tool_path("drupwn"):
+                self.on_log("drupwn still missing after install")
                 return False
             return True
 
