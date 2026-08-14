@@ -81,21 +81,7 @@ get_env() {
   printenv "$1" 2>/dev/null || true
 }
 
-# ── Welcome ───────────────────────────────────────────────────────────────
-ui_box "Welcome" 14 68 "
-         ╔══════════════════════════════════════════════╗
-         ║   HOUDINI BOOTSTRAP INSTALLER                ║
-         ╚══════════════════════════════════════════════╝
-
-This will install:
-  • Hermes Agent (latest version)
-  • Full scanning toolkit (nuclei, subfinder, nmap, sqlmap ...)
-  • Knowledge pack: prompts + tool/key registry + core skills
-  • Secrets entry (or skip and add later)
-
-Press OK to continue."
-
-ui_info "Check" "Checking requirements..."
+# ── Requirements check (both paths) ──────────────────────────────────────
 export PATH="$HOME/.local/bin:$PATH"
 for b in curl git; do
   command -v "$b" >/dev/null 2>&1 || { echo "✗ missing: $b"; exit 1; }
@@ -188,6 +174,18 @@ if [ "${HOUDINI_NO_TUI:-0}" != "1" ] && [ -f "$SCRIPT_DIR/src/installer-tui.py" 
   fi
 fi
 if [ "$TUI_FAILED" = 1 ]; then
+  ui_box "Welcome" 14 68 "
+         ╔══════════════════════════════════════════════╗
+         ║   HOUDINI BOOTSTRAP INSTALLER                ║
+         ╚══════════════════════════════════════════════╝
+
+This will install:
+  • Hermes Agent (latest version)
+  • Full scanning toolkit (nuclei, subfinder, nmap, sqlmap ...)
+  • Knowledge pack: prompts + tool/key registry + core skills
+  • Secrets entry (or skip and add later)
+
+Press OK to continue."
   ui_box "Fallback" 12 70 "The graphical wizard could not start. Reason:
 ${TUI_ERR:-unknown (see $LOG)}
 
