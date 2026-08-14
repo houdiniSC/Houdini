@@ -142,21 +142,20 @@ class WizardScreen(Screen):
                     with Vertical(id="step-welcome", classes="step"):
                         yield Static("", id="welcome_gradient")
                         yield Static(
-                            "█ █ ███ █ █ ██  ███ █ █\n"
-                            "███ █ █ █ █ █ █  █   ███\n"
-                            "█ █ ███ █ █ ██  ███ █ █",
+                            "██╗  ██╗ ██████╗ ██╗   ██╗██████╗ ██╗███╗   ██╗██╗\n"
+                            "██║  ██║██╔═══██╗██║   ██║██╔══██╗██║████╗  ██║██║\n"
+                            "███████║██║   ██║██║   ██║██║  ██║██║██╔██╗ ██║██║\n"
+                            "██╔══██║██║   ██║██║   ██║██║  ██║██║██║╚██╗██║██║\n"
+                            "██║  ██║╚██████╔╝╚██████╔╝██████╔╝██║██║ ╚████║██║\n"
+                            "╚═╝  ╚═╝ ╚═════╝  ╚═════╝ ╚═════╝ ╚═╝╚═╝  ╚═══╝╚═╝",
                             id="content_logo",
-                        )
-                        yield Static(
-                            "HOUDINI",
-                            id="welcome_title",
                         )
                         yield Static(
                             "Security gateway bootstrap for web & mobile testing",
                             id="content_sub",
                         )
                         yield Static(
-                            "الساحر هوديني — مساعدك الأمني لفحص التطبيقات والمواقع",
+                            "مساعدك الأمني لفحص التطبيقات والمواقع",
                             id="welcome_arabic",
                         )
                         yield Static(
@@ -1074,7 +1073,6 @@ class HoudiniInstaller(App):
     Button:hover { background: $primary; color: $background; }
 
     #step-welcome { align: center middle; }
-    #welcome_title { text-style: bold; color: $accent; text-align: center; margin-bottom: 0; }
     #content_logo { text-style: bold; color: $accent; text-align: center; }
     #content_sub { text-align: center; color: $text-muted; }
     #welcome_arabic { text-align: center; color: $text-muted; margin-bottom: 1; }
