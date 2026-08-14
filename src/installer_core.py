@@ -724,30 +724,48 @@ class LiveInstaller:
         if key == "drupal":
             if not (tools.get("droopescan") or tools.get("drupwn")):
                 return True
-            ok = True
+            # Judge by reality (tool exists on PATH), not by pip's exit code:
+            # the frida/prompt-toolkit resolver conflict makes pip exit 1
+            # even when everything installs fine.
             if tools.get("droopescan") and not tool_path("droopescan"):
                 # natural default: pip installs console scripts into the
                 # system Python bin (/usr/local/bin on Ubuntu)
-                ok = await self._sh(
+                await self._sh(
                     "sudo python3 -m pip install --break-system-packages -q droopescan"
-                ) and ok
+                )
             if tools.get("drupwn") and not tool_path("drupwn"):
-                ok = await self._sh(
-                    "sudo python3 -m pip install --break-system-packages -q 'setuptools<81'"
-                ) and ok
-                # drupwn has no PyPI release - git+https is its documented
-                # install path. Weak links drop the clone mid-fetch, so retry.
+                # drupwn (last release 2019) requires prompt_toolkit<=2.0.7
+                # while frida-tools needs 3.x - one environment can never
+                # satisfy both. Give drupwn its own venv + wrapper so it
+                # stops poisoning the system resolver verdict entirely.
+                venv = HERMES_HOME / "venvs" / "drupwn"
+                py = venv / "bin" / "python"
                 for attempt in (1, 2, 3):
-                    if await self._sh(
-                        "sudo python3 -m pip install --break-system-packages -q "
+                    made = await self._sh(
+                        f"python3 -m venv {shlex.quote(str(venv))} && "
+                        f"{shlex.quote(str(py))} -m pip install -q 'setuptools<81' && "
+                        f"{shlex.quote(str(py))} -m pip install -q "
                         "--no-build-isolation git+https://github.com/immunIT/drupwn"
-                    ):
+                    )
+                    if made:
                         break
-                    ok = False
                     if attempt < 3:
-                        self.on_log(f"drupwn clone failed — retrying in 8s...")
+                        self.on_log(f"drupwn venv install failed — retrying in 8s...")
                         await asyncio.sleep(8)
-            return ok
+                if py.is_file() and (venv / "lib").is_dir():
+                    launcher = f"#!/usr/bin/env bash\nexec {py} -m drupwn \"$@\"\n"
+                    await self._sh(
+                        f"printf '%s' {shlex.quote(launcher)} | sudo tee /usr/local/bin/drupwn >/dev/null "
+                        "&& sudo chmod +x /usr/local/bin/drupwn"
+                    )
+            missing = [
+                t for t in ("droopescan", "drupwn")
+                if tools.get(t) and not tool_path(t)
+            ]
+            if missing:
+                self.on_log(f"drupal tools still missing: {', '.join(missing)}")
+                return False
+            return True
 
         if key == "wpscan":
             if not tools.get("wpscan"):
@@ -850,44 +868,52 @@ class LiveInstaller:
             wanted = [t for t in ("apktool", "jadx", "frida") if tools.get(t)]
             if not wanted:
                 return True
-            ok = True
+            # Each tool: try documented install paths, then JUDGE BY REALITY
+            # (tool on PATH). Never let an expected failure (e.g. jadx is not
+            # in Ubuntu repos anymore) or a resolver warning mark the step
+            # failed when the tool actually landed.
             if "apktool" in wanted and not tool_path("apktool"):
                 self.on_log("installing apktool ...")
-                ok = await self._sh("sudo apt-get install -y -qq apktool") and ok
+                await self._sh("sudo apt-get install -y -qq apktool")
                 if not tool_path("apktool"):
-                    ok = await self._sh(
+                    await self._sh(
                         "cd /tmp && curl -fsSL -o apktool.jar "
                         "https://github.com/iBotPeaches/Apktool/releases/latest/download/apktool.jar "
                         "&& sudo cp apktool.jar /usr/local/bin/ && printf '#!/usr/bin/env bash\\nexec java -jar /usr/local/bin/apktool.jar \"$@\"\\n' | sudo tee /usr/local/bin/apktool >/dev/null "
                         "&& sudo chmod +x /usr/local/bin/apktool"
-                    ) and ok
+                    )
             if "jadx" in wanted and not tool_path("jadx"):
                 self.on_log("installing jadx ...")
-                # Ubuntu 24.04 dropped the jadx apt package: install the JRE
-                # separately, then try apt, then the official GitHub release.
-                ok = await self._sh(
+                # jadx is NOT in Ubuntu repos (dropped after 22.04) - the apt
+                # attempt logs "Unable to locate" but the GitHub release below
+                # is the real install path. Install the JRE first.
+                await self._sh(
                     "sudo apt-get install -y -qq openjdk-17-jre-headless"
-                ) and ok
+                )
                 if not tool_path("jadx"):
-                    ok = await self._sh(
-                        "sudo apt-get install -y -qq jadx"
-                    ) and ok
-                if not tool_path("jadx"):
-                    ok = await self._sh(
+                    await self._sh(
                         "cd /tmp && curl -fsSL -o jadx.zip "
                         "https://github.com/skylot/jadx/releases/download/v1.5.0/jadx-1.5.0.zip "
                         "&& sudo unzip -o -q jadx.zip -d /opt/jadx && sudo chmod +x /opt/jadx/bin/jadx "
                         "&& sudo ln -sf /opt/jadx/bin/jadx /usr/local/bin/jadx"
-                    ) and ok
+                    )
             if "frida" in wanted and not tool_path("frida"):
                 self.on_log("installing frida-tools + objection ...")
                 # --ignore-installed: Debian's blinker has no RECORD file, so
-                # pip cannot uninstall it and fails without this flag.
-                ok = await self._sh(
+                # pip cannot uninstall it and fails without this flag. The
+                # resolver may still exit non-zero over third-party conflicts
+                # (drupwn's prompt-toolkit pin) - reality check below decides.
+                await self._sh(
                     "sudo python3 -m pip install --break-system-packages "
                     "--ignore-installed -q frida-tools objection"
-                ) and ok
-            return ok
+                )
+                if tool_path("frida") and tool_path("objection"):
+                    self.on_log("frida-tools + objection ready")
+            missing = [t for t in wanted if not tool_path(t)]
+            if missing:
+                self.on_log(f"mobile tools still missing: {', '.join(missing)}")
+                return False
+            return True
 
         if key == "memory":
             enabled = bool(self.data.get("memory", True))
