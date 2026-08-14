@@ -366,10 +366,6 @@ if [ -x /home/hermes/hermes-venv/bin/python ]; then
 else
     apt-get update -qq
     apt-get install -y -qq python3 python3-pip python3-venv curl git unzip
-    # python3.12-dev: Hermes' install.sh pins Python 3.11, which Ubuntu 24.04
-    # does not ship; we patch it to 3.12 (apt-provided). The -dev headers let
-    # uv build any source-only wheels (no GitHub tarball downloads).
-    apt-get install -y -qq python3.12-dev 2>/dev/null || true
 fi
 # isolated venv for the installer: system pip conflicts with Debian packages
 if [ ! -x /home/hermes/hermes-venv/bin/python ]; then

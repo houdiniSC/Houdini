@@ -613,16 +613,6 @@ class LiveInstaller:
                 self.on_log(text)
         return (await proc.wait()) == 0
 
-    async def _ensure_pip(self) -> bool:
-        """Ubuntu 24.04+ ships python3 WITHOUT pip (PEP 668 / minimal cloud
-        images). Any step that needs system pip must call this first."""
-        if await self._sh("python3 -m pip --version >/dev/null 2>&1"):
-            return True
-        self.on_log("python3-pip missing — installing via apt...")
-        return await self._sh(
-            "sudo apt-get update -qq && sudo apt-get install -y -qq python3-pip unzip"
-        )
-
     async def _sh_out(self, cmd: str) -> str:
         """Run a command and return its last output line (for version probes)."""
         proc = await asyncio.create_subprocess_shell(
@@ -642,10 +632,22 @@ class LiveInstaller:
     async def _step(self, key: str) -> bool:
         tools = self.data["tools"]
         if key == "requirements":
+            # Base toolchain EVERY later step relies on: python3-pip is NOT
+            # shipped by Ubuntu 24.04+ (PEP 668) and unzip is needed for the
+            # jadx / nuclei GitHub releases - install them once, here.
             missing = [b for b in ("curl", "git") if shutil.which(b) is None]
+            if not shutil.which("unzip") or not await self._sh("python3 -m pip --version >/dev/null 2>&1"):
+                self.on_log("base toolchain: installing curl git python3-pip unzip...")
+                return await self._sh(
+                    "sudo apt-get update -qq && sudo apt-get install -y -qq "
+                    "curl git python3-pip unzip"
+                )
             if missing:
                 self.on_log(f"missing base tools: {', '.join(missing)} — installing via apt")
-                return await self._sh("sudo apt-get update -qq && sudo apt-get install -y -qq curl git")
+                return await self._sh(
+                    "sudo apt-get update -qq && sudo apt-get install -y -qq "
+                    + " ".join(missing)
+                )
             return True
 
         if key == "hermes":
@@ -722,8 +724,6 @@ class LiveInstaller:
         if key == "drupal":
             if not (tools.get("droopescan") or tools.get("drupwn")):
                 return True
-            if not await self._ensure_pip():
-                return False
             ok = True
             if tools.get("droopescan") and not tool_path("droopescan"):
                 # natural default: pip installs console scripts into the
@@ -850,10 +850,6 @@ class LiveInstaller:
             wanted = [t for t in ("apktool", "jadx", "frida") if tools.get(t)]
             if not wanted:
                 return True
-            # Ensures python3-pip (frida) and unzip (jadx GitHub release)
-            # exist before any sub-step touches them.
-            if not await self._ensure_pip():
-                return False
             ok = True
             if "apktool" in wanted and not tool_path("apktool"):
                 self.on_log("installing apktool ...")
@@ -885,8 +881,6 @@ class LiveInstaller:
                     ) and ok
             if "frida" in wanted and not tool_path("frida"):
                 self.on_log("installing frida-tools + objection ...")
-                if not await self._ensure_pip():
-                    return False
                 # --ignore-installed: Debian's blinker has no RECORD file, so
                 # pip cannot uninstall it and fails without this flag.
                 ok = await self._sh(
