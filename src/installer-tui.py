@@ -19,6 +19,24 @@ import asyncio
 import os
 import sys
 
+# ── Boot log (every startup phase lands here - /tmp/houdini-tui.log) ───────
+# Textual draws on stderr; redirecting it (as installers sometimes do) makes
+# the UI invisible while keys still work. This log lets the installer tell a
+# real startup crash apart from a clean user quit WITHOUT stealing stderr.
+_BOOT_LOG = "/tmp/houdini-tui.log"
+
+
+def _blog(msg: str) -> None:
+    try:
+        with open(_BOOT_LOG, "a", encoding="utf-8") as fh:
+            fh.write(msg + "\n")
+    except Exception:
+        pass
+
+
+_blog(f"=== boot {__file__} pid={os.getpid()} tty={sys.stderr.isatty()} "
+      f"TERM={os.environ.get('TERM')} size={os.environ.get('COLUMNS')}x{os.environ.get('LINES')} ===")
+
 from textual.app import App, ComposeResult
 from textual.binding import Binding
 from textual.containers import Horizontal, Vertical
@@ -43,6 +61,8 @@ from textual.widgets import (
     Tab,
     Tabs,
 )
+
+_blog("textual imports OK")
 
 from installer_core import (
     HERMES_HOME,
@@ -353,6 +373,7 @@ class WizardScreen(Screen):
         yield Footer()
 
     async def on_mount(self) -> None:
+        _blog("WizardScreen.on_mount: started")
         self.current = "welcome"
         self.config_loaded = False
         self.install_done = False
@@ -382,6 +403,8 @@ class WizardScreen(Screen):
         self._apply_model_preset("deepseek")
 
         await self._show("welcome")
+        _blog(f"WizardScreen.on_mount: done, welcome shown, "
+              f"app.size={self.app.size}")
 
     # ------------------------------------------------------------------ nav
     def _step_index(self, key: str) -> int:
@@ -1124,7 +1147,9 @@ class HoudiniInstaller(App):
         }
 
     def on_mount(self) -> None:
+        _blog("App.on_mount: pushing WizardScreen")
         self.push_screen(WizardScreen())
+        _blog("App.on_mount: WizardScreen pushed")
 
 
 # --------------------------------------------------------------------------
@@ -1328,13 +1353,26 @@ if __name__ == "__main__":
             cols, rows = shutil.get_terminal_size()
         except Exception:
             cols, rows = 80, 24
+        _blog(f"reported terminal size: {cols}x{rows}")
         if rows < 5 or cols < 20 or cols > 2000 or rows > 500:
             os.environ["COLUMNS"] = str(max(80, min(cols, 120)))
             os.environ["LINES"] = str(max(24, min(rows, 40)))
+            _blog(f"bogus size -> forced {os.environ['COLUMNS']}x{os.environ['LINES']}")
 
     def main() -> None:
+        _blog("main() entered")
         _fix_terminal_size()
-        HoudiniInstaller().run()
+        _blog("creating HoudiniInstaller...")
+        app = HoudiniInstaller()
+        _blog("calling app.run()...")
+        try:
+            app.run()
+            _blog("app.run() returned cleanly")
+        except BaseException as exc:  # noqa: BLE001 - log then re-raise
+            _blog(f"app.run() raised: {type(exc).__name__}: {exc}")
+            raise
+
+    _blog("starting main()")
 
     if "--selftest" in sys.argv:
         asyncio.run(selftest())

@@ -158,24 +158,23 @@ if [ "${HOUDINI_NO_TUI:-0}" != "1" ] && [ -f "$SCRIPT_DIR/src/installer-tui.py" 
     case "${TERM:-}" in
       dumb|""|unknown) export TERM=xterm-256color ;;
     esac
-    # Run the TUI. Textual draws on stderr, so a Traceback there means it
-    # crashed before taking over. Three outcomes:
-    #   - exit 0: install done (or user quit from the wizard) -> stop here
-    #   - non-zero + Traceback in stderr: real startup failure -> whiptail
-    #   - non-zero without Traceback (Ctrl+Q): user quit -> stop, no whiptail
-    "$TUI_VENV/bin/python" "$SCRIPT_DIR/src/installer-tui.py" 2> /tmp/houdini-tui.err
+    # Run the TUI. CRITICAL: Textual draws on STDERR - do not redirect it
+    # or the UI becomes invisible while keys still work. The TUI writes its
+    # own boot log to /tmp/houdini-tui.log; use that (not stderr) to tell a
+    # real startup crash apart from a clean user quit.
+    rm -f /tmp/houdini-tui.log
+    "$TUI_VENV/bin/python" "$SCRIPT_DIR/src/installer-tui.py"
     TUI_RC=$?
     if [ "$TUI_RC" = 0 ]; then
       exit 0
     fi
-    if grep -qE "Traceback|ModuleNotFoundError|ImportError|SyntaxError" /tmp/houdini-tui.err; then
+    if grep -qE "Traceback|ModuleNotFoundError|ImportError|SyntaxError" /tmp/houdini-tui.log 2>/dev/null; then
       TUI_FAILED=1
-      TUI_ERR=$(grep -E "Traceback|ModuleNotFoundError|ImportError|Error:" /tmp/houdini-tui.err | tail -3 | tr '\n' ' ')
+      TUI_ERR=$(grep -E "Traceback|ModuleNotFoundError|ImportError|Error:|raised:" /tmp/houdini-tui.log 2>/dev/null | tail -3 | tr '\n' ' ')
     else
       # User quit the wizard (Ctrl+Q / Esc) - honor it, never start whiptail
       exit 0
     fi
-    rm -f /tmp/houdini-tui.err
   fi
 fi
 if [ "$TUI_FAILED" = 1 ]; then
