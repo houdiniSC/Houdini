@@ -60,8 +60,8 @@ It reads secrets from **environment variables first** (no file needed):
 api_key=sk-... bot=123:token model_provider=deepseek bash install-ubuntu.sh
 ```
 
-or from `config/secrets.env` as a fallback (copy `src/secrets.env.example`
-there). The install log goes to `/tmp/houdini-bootstrap.log`.
+Secrets come ONLY from env vars — the installer never reads a secrets file.
+The install log goes to `/tmp/houdini-bootstrap.log`.
 
 ## Remove the distro
 
@@ -82,10 +82,9 @@ OpenAI-compatible provider - DeepSeek, OpenAI, OpenCode or a custom
 endpoint) and the Telegram bot token. Everything else is optional and
 can be detected or added later at first conversation.
 
-For a fast scripted install, either export the values as env vars
-(`api_key`, `bot`, `model_provider`, `model`, ...) or copy
-`src/secrets.env.example` to `config/secrets.env` (the `config/` folder is
-git-ignored) — same field names as the wizard's encrypted `.hcfg` config.
+For a fast scripted install, export the values as env vars (`api_key`, `bot`,
+`model_provider`, `model`, ...) — same field names as the wizard's encrypted
+`.hcfg` config. `src/secrets.env.example` only documents the field names.
 
 ## Security
 

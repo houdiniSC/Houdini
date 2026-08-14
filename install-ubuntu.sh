@@ -1,14 +1,12 @@
 #!/usr/bin/env bash
 # install-ubuntu.sh — Houdini Gateway Installer (whiptail UI, native Ubuntu)
 # Target: WSL2 Ubuntu (run as the normal user).
-# Secrets: read from secrets.env if present, else ask via UI (empty = skip).
+# Secrets: read from environment variables, else ask via UI (empty = skip).
 # Sudo: agent permissions are configured via sudoers.d — no stored password.
 set -uo pipefail
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 PACK_DIR="$SCRIPT_DIR/knowledge-pack"
-SECRETS_FILE="$SCRIPT_DIR/config/secrets.env"
-[ -f "$SECRETS_FILE" ] || SECRETS_FILE="$SCRIPT_DIR/src/secrets.env"
 HERMES_HOME="$HOME/.hermes"
 LOG="/tmp/houdini-bootstrap.log"
 : > "$LOG"
@@ -76,13 +74,11 @@ ui_radio() { # ui_radio <title> <prompt> <items...> -> prints selection
   fi
 }
 
-# Secrets come from environment variables first (no file needed):
+# Secrets come ONLY from environment variables (no file):
 #   api_key=sk-... bot=123:token ./install-ubuntu.sh
-# or export them before running. Falls back to config/secrets.env.
+# or export them before running.
 get_env() {
-  local v
-  v="$(printenv "$1" 2>/dev/null)" && { printf '%s' "$v"; return; }
-  grep -E "^$1=" "$SECRETS_FILE" 2>/dev/null | head -1 | cut -d= -f2-
+  printenv "$1" 2>/dev/null || true
 }
 
 # ── Welcome ───────────────────────────────────────────────────────────────
@@ -207,7 +203,7 @@ ui_box "Secrets" 10 66 "
 الآن سنسأل عن الإعدادات والأسرار.
 أي حقل تتركه فارغًا ثم Enter = تخطي (يُضاف لاحقًا).
 
-لو حضرت ملف secrets.env بجانب السكربت، الأسرار ستُقرأ تلقائيًا."
+لو صدّرت الأسرار كمتغيرات بيئة، ستُقرأ تلقائيًا."
 
 ask_sec() { # ask_sec <var> <title> <prompt> <envname>
   local __v=$1 __title=$2 __prompt=$3 __env=$4 __val
