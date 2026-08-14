@@ -728,20 +728,32 @@ class LiveInstaller:
             # the frida/prompt-toolkit resolver conflict makes pip exit 1
             # even when everything installs fine.
             if tools.get("droopescan") and not tool_path("droopescan"):
-                # natural default: pip installs console scripts into the
-                # system Python bin (/usr/local/bin on Ubuntu)
-                await self._sh(
-                    "sudo python3 -m pip install --break-system-packages -q droopescan"
+                # Isolate droopescan (2021) in its own venv, exactly like
+                # drupwn. Its legacy cement dependency calls
+                # inspect.getargspec, which Python 3.11+ removed - patch it
+                # inside the venv so the tool actually runs.
+                venv = HERMES_HOME / "venvs" / "droopescan"
+                py = venv / "bin" / "python"
+                made = await self._sh(
+                    f"python3 -m venv {shlex.quote(str(venv))} && "
+                    f"{shlex.quote(str(py))} -m pip install -q droopescan"
                 )
+                if made:
+                    await self._sh(
+                        f"find {shlex.quote(str(venv / 'lib'))} -name '*.py' "
+                        "-exec sed -i 's/inspect\\.getargspec/inspect.getfullargspec/g' {} + 2>/dev/null; true"
+                    )
+                bin_script = venv / "bin" / "droopescan"
+                if bin_script.is_file():
+                    launcher = f"#!/usr/bin/env bash\nexec {bin_script} \"$@\"\n"
+                    await self._sh(
+                        f"printf '%s' {shlex.quote(launcher)} | sudo tee /usr/local/bin/droopescan >/dev/null "
+                        "&& sudo chmod +x /usr/local/bin/droopescan"
+                    )
                 if not tool_path("droopescan"):
-                    # droopescan 1.45.1 (last release 2021) is broken on
-                    # Python 3.12+: its legacy cement framework fails at
-                    # import and pip generates no console script. It is
-                    # best-effort only - drupwn + nuclei Drupal templates
-                    # cover the same ground.
                     self.on_log(
-                        "! droopescan unavailable (legacy cement framework "
-                        "breaks on modern Python) — drupwn + nuclei cover Drupal"
+                        "! droopescan could not be made runnable (2021 "
+                        "codebase) — drupwn + nuclei cover Drupal"
                     )
             if tools.get("drupwn") and not tool_path("drupwn"):
                 # drupwn (last release 2019) requires prompt_toolkit<=2.0.7
