@@ -155,10 +155,6 @@ class WizardScreen(Screen):
                             id="content_sub",
                         )
                         yield Static(
-                            "مساعدك الأمني لفحص التطبيقات والمواقع",
-                            id="welcome_arabic",
-                        )
-                        yield Static(
                             f"[{EMERALD}]●[/] Live apt / binary installation\n"
                             f"[{EMERALD}]●[/] Dynamic tool & key inventory\n"
                             f"[{EMERALD}]●[/] Masked secrets entry\n"
@@ -446,6 +442,14 @@ class WizardScreen(Screen):
         nxt = self.query_one("#next", Button)
         step = self.current
         back.disabled = step in ("welcome", "install", "summary")
+        # Welcome screen: hide the bottom nav buttons entirely — the big
+        # "Start Installation" button in the content area is the only CTA.
+        if step == "welcome":
+            back.display = False
+            nxt.display = False
+        else:
+            back.display = True
+            nxt.display = True
         if step == "welcome":
             nxt.label = "Start >"
             nxt.variant = "primary"
@@ -1075,7 +1079,6 @@ class HoudiniInstaller(App):
     #step-welcome { align: center middle; }
     #content_logo { text-style: bold; color: $accent; text-align: center; }
     #content_sub { text-align: center; color: $text-muted; }
-    #welcome_arabic { text-align: center; color: $text-muted; margin-bottom: 1; }
     #welcome_gradient { height: 2; margin-bottom: 1; }
     #welcome_features { margin: 1 0; color: $text-muted; }
     #welcome_start { margin-top: 1; }
@@ -1204,7 +1207,7 @@ async def selftest() -> None:
             await pilot2.pause()
 
         await pilot2.pause()
-        await press2("next")  # welcome -> config
+        await press2("welcome_start")  # welcome -> config
         await press2("next")  # config (skip) -> core
         app2.screen.query_one("#api_key", Input).value = "sk-demo"
         await press2("next")  # core -> telegram
@@ -1226,7 +1229,7 @@ async def selftest() -> None:
             await pilot3.pause()
 
         await pilot3.pause()
-        await press3("next")  # welcome -> config
+        await press3("welcome_start")  # welcome -> config
         await press3("next")  # config (skip) -> core
         rs3 = app3.screen.query_one("#model_providers", RadioSet)
         for rb in rs3.query(RadioButton):
@@ -1254,7 +1257,7 @@ async def selftest() -> None:
             await pilot4.pause()
 
         await pilot4.pause()
-        await press4("next")  # welcome -> config
+        await press4("welcome_start")  # welcome -> config
         await press4("next")  # config (skip) -> core
         rs4 = app4.screen.query_one("#model_providers", RadioSet)
         for rb in rs4.query(RadioButton):
@@ -1287,7 +1290,7 @@ async def selftest() -> None:
             await pilot5.pause()
 
         await pilot5.pause()
-        await press5("next")  # welcome -> config
+        await press5("welcome_start")  # welcome -> config
         await press5("next")  # config (skip) -> core
         rs5 = app5.screen.query_one("#model_providers", RadioSet)
         for rb in rs5.query(RadioButton):

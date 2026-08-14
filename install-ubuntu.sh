@@ -37,7 +37,7 @@ ui_ask() { # ui_ask <title> <prompt> -> prints value (empty = skip)
     val=$(whiptail --backtitle "Houdini Bootstrap Installer" --title "$title" \
       --inputbox "$prompt
 
-(اتركه فارغًا ثم Enter للتخطي)" 10 70 3>&1 1>&2 2>&3 || true)
+(leave empty and press Enter to skip)" 10 70 3>&1 1>&2 2>&3 || true)
   else
     printf '%s (Enter = skip): ' "$prompt"; IFS= read -r val || val=""
   fi
@@ -87,15 +87,15 @@ ui_box "Welcome" 14 68 "
          ║   HOUDINI BOOTSTRAP INSTALLER                ║
          ╚══════════════════════════════════════════════╝
 
-سيتم تثبيت:
-  • Hermes Agent (أحدث إصدار)
-  • أدوات الفحص الكاملة (nuclei, subfinder, nmap, sqlmap ...)
-  • حزمة المعرفة: البرومبت + نظام الأدوات والمفاتيح + المهارات الأساسية
-  • إدخال الأسرار (أو تخطيها وإضافتها لاحقًا)
+This will install:
+  • Hermes Agent (latest version)
+  • Full scanning toolkit (nuclei, subfinder, nmap, sqlmap ...)
+  • Knowledge pack: prompts + tool/key registry + core skills
+  • Secrets entry (or skip and add later)
 
-اضغط OK للمتابعة."
+Press OK to continue."
 
-ui_info "Check" "التحقق من المتطلبات..."
+ui_info "Check" "Checking requirements..."
 export PATH="$HOME/.local/bin:$PATH"
 for b in curl git; do
   command -v "$b" >/dev/null 2>&1 || { echo "✗ missing: $b"; exit 1; }
@@ -103,15 +103,15 @@ done
 
 # ── 1) Hermes core ─────────────────────────────────────────────────────────
 if command -v hermes >/dev/null 2>&1; then
-  ui_info "Hermes" "✓ Hermes موجود: $(hermes --version 2>/dev/null | head -1)"
+  ui_info "Hermes" "✓ Hermes found: $(hermes --version 2>/dev/null | head -1)"
 else
-  ui_info "Hermes" "جاري تثبيت Hermes Agent..."
+  ui_info "Hermes" "Installing Hermes Agent..."
   curl -fsSL https://hermes-agent.nousresearch.com/install.sh | bash -s -- --non-interactive --skip-setup >> "$LOG" 2>&1 \
-    || { ui_box "Error" 8 60 "✗ فشل تثبيت Hermes — شاهد $LOG"; exit 1; }
+    || { ui_box "Error" 8 60 "✗ Hermes install failed — see $LOG"; exit 1; }
 fi
 
 # ── 2) Security toolchain ──────────────────────────────────────────────────
-ui_info "Tools" "تثبيت أدوات apt (nmap, nikto, sqlmap ...)"
+ui_info "Tools" "Installing apt tools (nmap, nikto, sqlmap ...)"
 sudo apt-get update -qq >> "$LOG" 2>&1
 sudo apt-get install -y -qq nmap nikto sqlmap gobuster ffuf whatweb dnsutils \
   netcat-openbsd jq unzip openvpn >> "$LOG" 2>&1
@@ -122,30 +122,30 @@ for p in "nuclei v3.11.0 nuclei_3.11.0_linux_amd64.zip" \
   set -- $p
   name=$1; ver=$2; file=$3
   [ -x "/usr/local/bin/$name" ] && continue
-  ui_info "Tools" "تثبيت $name..."
+  ui_info "Tools" "Installing $name..."
   cd /tmp && curl -fsSL -o "$file" "https://github.com/projectdiscovery/$name/releases/download/$ver/$file" \
     && unzip -o -q "$file" -d /usr/local/bin && chmod +x "/usr/local/bin/$name"
 done
 
 command -v ngrok >/dev/null 2>&1 || {
-  ui_info "Tools" "تثبيت ngrok..."
+  ui_info "Tools" "Installing ngrok..."
   cd /tmp && curl -fsSL -o ngrok.tgz https://bin.equinox.io/c/bNyj1mQVY4c/ngrok-v3-stable-linux-amd64.tgz \
     && tar xzf ngrok.tgz -C /usr/local/bin; }
 
 export PATH="$HERMES_HOME/bin:$PATH"
 command -v droopescan >/dev/null 2>&1 || {
-  ui_info "Tools" "تثبيت droopescan + drupwn (pip)..."
+  ui_info "Tools" "Installing droopescan + drupwn (pip)..."
   sudo python3 -m pip install --break-system-packages droopescan >> "$LOG" 2>&1
   sudo python3 -m pip install --break-system-packages 'setuptools<81' >> "$LOG" 2>&1
   sudo python3 -m pip install --break-system-packages --no-build-isolation git+https://github.com/immunIT/drupwn >> "$LOG" 2>&1
 }
 
-ui_info "Tools" "تحديث قوالب nuclei..."
+ui_info "Tools" "Updating nuclei templates..."
 command -v nuclei >/dev/null 2>&1 && nuclei -update-templates >> "$LOG" 2>&1
 
 # ── 3) Merge knowledge pack (hand-written, no traces) ──────────────────────
 if [ -d "$PACK_DIR" ]; then
-  ui_info "Knowledge" "دمج حزمة المعرفة..."
+  ui_info "Knowledge" "Merging knowledge pack..."
   mkdir -p "$HERMES_HOME"
   [ -f "$PACK_DIR/SOUL.md" ] && cp "$PACK_DIR/SOUL.md" "$HERMES_HOME/SOUL.md"
   [ -f "$PACK_DIR/config.template.yaml" ] && cp "$PACK_DIR/config.template.yaml" "$HERMES_HOME/config.template.yaml"
@@ -166,8 +166,8 @@ if [ -d "$PACK_DIR" ]; then
 fi
 
 # browser-capture: Playwright + mitmproxy + Chromium (optional, large)
-if ask_tool "Browser Capture" "تثبيت browser-capture (Playwright + Chromium + mitmproxy, ~200MB)؟"; then
-  ui_info "Tools" "تثبيت browser-capture (playwright + mitmproxy)..."
+if ask_tool "Browser Capture" "Install browser-capture (Playwright + Chromium + mitmproxy, ~200MB)?"; then
+  ui_info "Tools" "Installing browser-capture (playwright + mitmproxy)..."
   python3 -m venv "$HOME/browser-venv"
   "$HOME/browser-venv/bin/pip" install -q playwright mitmproxy >> "$LOG" 2>&1
   sudo "$HOME/browser-venv/bin/playwright" install --with-deps chromium >> "$LOG" 2>&1
@@ -175,12 +175,12 @@ if ask_tool "Browser Capture" "تثبيت browser-capture (Playwright + Chromium
     "$HOME/browser-venv/bin/python" "$HERMES_HOME/toolkit/tools/browser-capture.py" \
     | sudo tee /usr/local/bin/browser-capture >/dev/null
   sudo chmod +x /usr/local/bin/browser-capture
-  ui_info "Tools" "browser-capture جاهز"
+  ui_info "Tools" "browser-capture ready"
 fi
 
 # mobile toolchain: apktool + jadx + frida (APK testing)
-if ask_tool "Mobile Tools" "تثبيت أدوات APK (apktool + jadx + frida/objection)؟"; then
-  ui_info "Tools" "تثبيت أدوات الموبايل..."
+if ask_tool "Mobile Tools" "Install APK tools (apktool + jadx + frida/objection)?"; then
+  ui_info "Tools" "Installing mobile tools..."
   sudo apt-get install -y -qq apktool openjdk-17-jre-headless jadx >> "$LOG" 2>&1
   command -v apktool >/dev/null 2>&1 || {
     curl -fsSL -o /tmp/apktool.jar https://github.com/iBotPeaches/Apktool/releases/latest/download/apktool.jar
@@ -195,15 +195,15 @@ if ask_tool "Mobile Tools" "تثبيت أدوات APK (apktool + jadx + frida/ob
     sudo ln -sf /opt/jadx/bin/jadx /usr/local/bin/jadx
   }
   sudo python3 -m pip install --break-system-packages -q frida-tools objection >> "$LOG" 2>&1
-  ui_info "Tools" "أدوات الموبايل جاهزة"
+  ui_info "Tools" "Mobile tools ready"
 fi
 
 # ── 4) Secrets (UI with skip) ──────────────────────────────────────────────
 ui_box "Secrets" 10 66 "
-الآن سنسأل عن الإعدادات والأسرار.
-أي حقل تتركه فارغًا ثم Enter = تخطي (يُضاف لاحقًا).
+Now for settings and secrets.
+Leave any field empty + Enter = skip (add later).
 
-لو صدّرت الأسرار كمتغيرات بيئة، ستُقرأ تلقائيًا."
+Secrets exported as environment variables are read automatically."
 
 ask_sec() { # ask_sec <var> <title> <prompt> <envname>
   local __v=$1 __title=$2 __prompt=$3 __env=$4 __val
@@ -218,9 +218,9 @@ ask_tool() { # ask_tool <title> <text> -> 0 install / 1 skip (default: yes)
   [ "$CUSTOMIZE" = 1 ] && ui_yesno "$1" "$2" || return 0
 }
 
-ask_sec bot "Telegram Bot" "توكن البوت من @BotFather" bot
+ask_sec bot "Telegram Bot" "Bot token from @BotFather" bot
 CUSTOMIZE=0
-if ui_yesno "Customize" "متابعة تهيئة المفاتيح والأدوات الاختيارية؟ (لا = تثبيت سريع بالإعدادات الافتراضية)"; then
+if ui_yesno "Customize" "Continue to customize keys and optional tools? (No = quick install with defaults)"; then
   CUSTOMIZE=1
 fi
 
@@ -229,7 +229,7 @@ fi
 # user never has to type a base URL unless they pick Custom.
 MODEL_PROVIDER="$(get_env model_provider)"
 if [ -z "$MODEL_PROVIDER" ] && [ "$CUSTOMIZE" = 1 ]; then
-  MODEL_PROVIDER=$(ui_radio "AI Provider" "اختر مزود الذكاء الاصطناعي (OpenAI-compatible):" \
+  MODEL_PROVIDER=$(ui_radio "AI Provider" "Choose your AI provider (OpenAI-compatible):" \
     "DeepSeek" "OpenAI" "OpenCode" "Custom")
 fi
 case "$MODEL_PROVIDER" in
@@ -245,9 +245,9 @@ case "$MODEL_PROVIDER" in
   custom)   DEFAULT_MODEL="";                  DEFAULT_BASE_URL="" ;;
   *)        MODEL_PROVIDER="deepseek";         DEFAULT_MODEL="deepseek-v4-flash"; DEFAULT_BASE_URL="https://api.deepseek.com/v1" ;;
 esac
-ask_sec model_base_url "AI Base URL" "رابط API (فارغ = تلقائي للمزود; مطلوب فقط عند Custom)" model_base_url
+ask_sec model_base_url "AI Base URL" "API base URL (empty = provider default; required for Custom)" model_base_url
 [ -n "$model_base_url" ] || model_base_url="$DEFAULT_BASE_URL"
-ask_sec api_key "AI API Key" "مفتاح API للمزود (sk-...)" api_key
+ask_sec api_key "AI API Key" "API key for the provider (sk-...)" api_key
 
 # Dynamic model list: live catalog from the provider's OpenAI-compatible
 # /models endpoint (uses the key above); curated presets as fallback.
@@ -271,41 +271,41 @@ if [ "${#MODEL_CHOICES[@]}" -gt 40 ]; then
 fi
 model="$(get_env model)"
 if [ -z "$model" ] && [ "$CUSTOMIZE" = 1 ] && [ "${#MODEL_CHOICES[@]}" -gt 1 ]; then
-  model=$(ui_radio "AI Model" "اختر الموديل (قائمة $MODEL_PROVIDER):" "${MODEL_CHOICES[@]}")
+  model=$(ui_radio "AI Model" "Choose the model ($MODEL_PROVIDER list):" "${MODEL_CHOICES[@]}")
 fi
 [ -n "$model" ] || model="${DEFAULT_MODEL:-}"
-ask_sec users "Telegram Users" "معرفات المستخدمين المسموحين (فواصل)" users
+ask_sec users "Telegram Users" "Allowed Telegram user IDs (comma-separated)" users
 ask_sec github "Recon - GitHub" "GitHub PAT (subfinder + gh/git)" github
-ask_sec virustotal "Recon - VirusTotal" "مفتاح VirusTotal" virustotal
-ask_sec shodan "Recon - Shodan" "مفتاح Shodan (subfinder + uncover)" shodan
-ask_sec urlscan "Recon - URLScan" "مفتاح URLScan" urlscan
-ask_sec dnsdumpster "Recon - DNSDumpster" "مفتاح DNSDumpster" dnsdumpster
-ask_sec zoomeye "Recon - ZoomEye" "مفتاح ZoomEye (host:key) (subfinder + uncover)" zoomeye
-ask_sec fofa "Recon - Fofa" "مفتاح Fofa (email:key)" fofa
-ask_sec vulners "Vulners" "مفتاح Vulners" vulners
-ask_sec wpscan "WPScan" "توكن WPScan" wpscan
+ask_sec virustotal "Recon - VirusTotal" "VirusTotal key" virustotal
+ask_sec shodan "Recon - Shodan" "Shodan key (subfinder + uncover)" shodan
+ask_sec urlscan "Recon - URLScan" "URLScan key" urlscan
+ask_sec dnsdumpster "Recon - DNSDumpster" "DNSDumpster key" dnsdumpster
+ask_sec zoomeye "Recon - ZoomEye" "ZoomEye key (host:key) (subfinder + uncover)" zoomeye
+ask_sec fofa "Recon - Fofa" "Fofa key (email:key)" fofa
+ask_sec vulners "Vulners" "Vulners key" vulners
+ask_sec wpscan "WPScan" "WPScan token" wpscan
 ask_sec ngrok "ngrok" "ngrok authtoken" ngrok
-ask_sec vpn_user "VPN" "اسم مستخدم VPN (المزود الافتراضي)" vpn_user
-ask_sec vpn_pass "VPN" "كلمة مرور VPN (المزود الافتراضي)" vpn_pass
-ask_sec vpn_profiles_dir "VPN" "مجلد بروفيلات OpenVPN (.ovpn) - يدعم مجلدات فرعية لكل مزود" vpn_profiles_dir
+ask_sec vpn_user "VPN" "VPN username (default provider)" vpn_user
+ask_sec vpn_pass "VPN" "VPN password (default provider)" vpn_pass
+ask_sec vpn_profiles_dir "VPN" "OpenVPN profiles folder (.ovpn) - supports per-provider subfolders" vpn_profiles_dir
 ask_sec brave "Search" "Brave Search API key" brave
 ask_sec serpapi "Search" "SerpAPI key" serpapi
 ask_sec nvd "NVD" "NVD API key" nvd
-ask_sec home_channel "Telegram" "Home channel (اختياري — اتركه فارغًا للتعرف التلقائي عند أول استخدام)" home_channel
-ask_sec home_user "Telegram" "معرف محادثتك الخاصة (اختياري — اتركه فارغًا للتعرف التلقائي)" home_user
+ask_sec home_channel "Telegram" "Home channel (optional — empty = auto-detect on first use)" home_channel
+ask_sec home_user "Telegram" "Your private chat ID (optional — empty = auto-detect)" home_user
 
 # ── 5) Agent sudo permissions (no stored password) ─────────────────────────
 if [ "$CUSTOMIZE" = 1 ]; then
-  SUDO_MODE=$(ui_radio "Sudo" "صلاحيات الوكيل على النظام:" \
-    "مقنّن (موصى به)" "واسع (كل شيء)" "بدون")
+  SUDO_MODE=$(ui_radio "Sudo" "Agent permissions on the system:" \
+    "Restricted (recommended)" "Wide (everything)" "None")
 else
-  SUDO_MODE="مقنّن (موصى به)"
+  SUDO_MODE="Restricted (recommended)"
 fi
 case "$SUDO_MODE" in
-  *واسع*)
+  *Wide*)
     SUDOERS_LINE="$USER ALL=(ALL) NOPASSWD: SETENV: ALL"
     ;;
-  *مقنّن*)
+  *Restricted*)
     SUDOERS_LINE="$USER ALL=(ALL) NOPASSWD: SETENV: /usr/sbin/openvpn, /usr/bin/systemctl, /usr/bin/apt, /usr/bin/apt-get, /usr/bin/nmap, /usr/sbin/tcpdump, /usr/bin/docker"
     ;;
   *)
@@ -313,15 +313,15 @@ case "$SUDO_MODE" in
     ;;
 esac
 if [ -n "$SUDOERS_LINE" ]; then
-  ui_info "Sudo" "كتابة صلاحيات الوكيل في /etc/sudoers.d (سيتطلب كلمة مرورك مرة واحدة)..."
+  ui_info "Sudo" "Writing agent permissions to /etc/sudoers.d (your password may be asked once)..."
   printf '%s\n' "$SUDOERS_LINE" | sudo tee "/etc/sudoers.d/hermes-$USER" >/dev/null 2>>"$LOG" \
     && sudo chmod 440 "/etc/sudoers.d/hermes-$USER" >> "$LOG" 2>&1 \
     && echo "sudoers written: /etc/sudoers.d/hermes-$USER" >> "$LOG" \
-    || ui_box "Sudo" 8 60 "✗ لم نتمكن من كتابة صلاحيات sudo — يمكنك إضافتها يدويًا لاحقًا."
+    || ui_box "Sudo" 8 60 "✗ Could not write sudo permissions — add them manually later."
 fi
 
 # ── 6) Write configs & keys ────────────────────────────────────────────────
-ui_info "Config" "كتابة الإعدادات..."
+ui_info "Config" "Writing configs..."
 mkdir -p "$HERMES_HOME"
 
 if [ -n "$api_key" ] && [ -n "$model" ] && [ -n "$model_base_url" ]; then
@@ -405,7 +405,7 @@ fi
 
 chmod 600 "$HERMES_HOME/.env" 2>/dev/null || true
 
-ui_info "Memory" "تفعيل الذاكرة المحلية (Holographic / SQLite) — بدون خادم أو تحميلات خارجية"
+ui_info "Memory" "Enabling local memory (Holographic / SQLite) — no server, no external downloads"
 
 mkdir -p "$HOME/.config/subfinder"
 {
@@ -449,7 +449,7 @@ fi
 
 # ── 7) Toolkit first scan + hourly refresh ─────────────────────────────────
 if [ -x "$HERMES_HOME/toolkit/toolkit-scan.sh" ]; then
-  ui_info "Toolkit" "توليد كتالوج الأدوات والمفاتيح الأول..."
+  ui_info "Toolkit" "Generating first tool & key inventory..."
   bash "$HERMES_HOME/toolkit/toolkit-scan.sh" >> "$LOG" 2>&1
   if command -v crontab >/dev/null 2>&1; then
     ( crontab -l 2>/dev/null | grep -v 'toolkit-scan' ; \
@@ -459,7 +459,7 @@ fi
 
 # ── 8) Start gateway ───────────────────────────────────────────────────────
 if [ -n "$bot" ]; then
-  ui_info "Gateway" "تشغيل بوابة Hermes..."
+  ui_info "Gateway" "Starting Hermes gateway..."
   export XDG_RUNTIME_DIR="/run/user/$(id -u)"
   hermes gateway install >> "$LOG" 2>&1
   hermes gateway start >> "$LOG" 2>&1
@@ -467,8 +467,8 @@ fi
 
 # ── 8b) Hermes WebUI (side-by-side browser dashboard) ──────────────────────
 WEBUI_URL=""
-if ask_tool "WebUI" "تثبيت Hermes WebUI (لوحة تحكم المتصفح) جنبًا إلى جنب مع البوابة؟"; then
-  ui_info "WebUI" "تثبيت لوحة تحكم المتصفح..."
+if ask_tool "WebUI" "Install Hermes WebUI (browser dashboard) side-by-side with the gateway?"; then
+  ui_info "WebUI" "Installing browser dashboard..."
   if [ ! -d "$HOME/hermes-webui/.git" ]; then
     git clone --depth 1 https://github.com/nesquena/hermes-webui.git "$HOME/hermes-webui" >> "$LOG" 2>&1
   fi
@@ -477,30 +477,30 @@ if ask_tool "WebUI" "تثبيت Hermes WebUI (لوحة تحكم المتصفح) 
     export HERMES_WEBUI_PORT="${HERMES_WEBUI_PORT:-8787}"
     (cd "$HOME/hermes-webui" && ./ctl.sh start) >> "$LOG" 2>&1
     WEBUI_URL="http://$HERMES_WEBUI_HOST:$HERMES_WEBUI_PORT"
-    ui_info "WebUI" "جاهز: $WEBUI_URL"
+    ui_info "WebUI" "Ready: $WEBUI_URL"
   else
-    ui_box "WebUI" 8 60 "✗ تعذر العثور على ctl.sh — شاهد $LOG"
+    ui_box "WebUI" 8 60 "✗ ctl.sh not found — see $LOG"
   fi
 fi
 
 # ── 10) Summary ────────────────────────────────────────────────────────────
 MISSING=""
 [ -z "$api_key" ] && MISSING="$MISSING
-• AI API key (بدونه لن يعمل الوكيل)"
+• AI API key (agent won't work without it)"
 [ -z "$bot" ]  && MISSING="$MISSING
-• Telegram bot token (بدونه لن تعمل البوابة)"
+• Telegram bot token (gateway won't work without it)"
 [ -z "$ngrok" ]     && MISSING="$MISSING
 • ngrok authtoken"
 
 ui_box "Done" 14 68 "
-اكتمل التثبيت ✅
+Installation complete ✅
 
-الوكيل جاهز. عند أول رسالة في قروب تيليجرام سيجهّز نفسه تلقائيًا
-(البوابة تعمل، وأي مفتاح/أداة جديدة تُكتشف ذاتيًا — الاسم والشخصية يُسألان في أول محادثة).
+The agent is ready. On your first Telegram group message it will set itself up automatically
+(gateway is running, new keys/tools are auto-detected — name and personality are asked on first chat).
 
-${WEBUI_URL:+لوحة تحكم المتصفح (WebUI): $WEBUI_URL
+${WEBUI_URL:+Browser dashboard (WebUI): $WEBUI_URL
 }
-الذاكرة المحلية (SQLite) مفعّلة افتراضيًا — حقائق fact_store في ~/.hermes/memory_store.db
-سجل التثبيت: $LOG
-الإعدادات: $HERMES_HOME
-${MISSING:+أشياء تركتها فارغًا وتضيفها لاحقًا:$MISSING}"
+Local memory (SQLite) enabled by default — fact_store facts in ~/.hermes/memory_store.db
+Install log: $LOG
+Config home: $HERMES_HOME
+${MISSING:+Left empty — add later:$MISSING}"

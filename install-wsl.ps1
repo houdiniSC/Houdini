@@ -174,6 +174,14 @@ irm `"`$src\install-wsl.ps1`" | iex"
     }
 
     $existing = wsl --list --quiet 2>$null | Where-Object { $_ -match [regex]::Escape($Distro) }
+    # wsl --list output can be UTF-16 with null bytes on some Windows builds;
+    # fall back to wsl -l -v parsing if the quiet list looks empty.
+    if (-not $existing) {
+        $verboseList = wsl --list --verbose 2>$null | Out-String
+        if ($verboseList -match [regex]::Escape($Distro)) {
+            $existing = $Distro
+        }
+    }
     if ($existing) {
         Log "Distro '$Distro' already exists -- reusing it."
     } else {
