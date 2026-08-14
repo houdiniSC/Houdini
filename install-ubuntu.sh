@@ -106,7 +106,13 @@ if command -v hermes >/dev/null 2>&1; then
   ui_info "Hermes" "✓ Hermes found: $(hermes --version 2>/dev/null | head -1)"
 else
   ui_info "Hermes" "Installing Hermes Agent..."
-  curl -fsSL https://hermes-agent.nousresearch.com/install.sh | bash -s -- --non-interactive --skip-setup >> "$LOG" 2>&1 \
+  # install.sh hardcodes PYTHON_VERSION="3.11"; Ubuntu 24.04 ships only 3.12,
+  # so uv would download a python-build-standalone tarball from GitHub
+  # (~200MB, flaky on slow links). Patch the script to use the apt 3.12:
+  # uv python find 3.12 resolves to /usr/bin/python3.12, nothing downloads.
+  curl -fsSL https://hermes-agent.nousresearch.com/install.sh \
+    | sed 's/^PYTHON_VERSION="3.11"/PYTHON_VERSION="3.12"/' \
+    | bash -s -- --non-interactive --skip-setup >> "$LOG" 2>&1 \
     || { ui_box "Error" 8 60 "✗ Hermes install failed — see $LOG"; exit 1; }
 fi
 
@@ -114,7 +120,7 @@ fi
 ui_info "Tools" "Installing apt tools (nmap, nikto, sqlmap ...)"
 sudo apt-get update -qq >> "$LOG" 2>&1
 sudo apt-get install -y -qq nmap nikto sqlmap gobuster ffuf whatweb dnsutils \
-  netcat-openbsd jq unzip openvpn >> "$LOG" 2>&1
+  netcat-openbsd jq unzip openvpn python3.12-dev >> "$LOG" 2>&1
 
 for p in "nuclei v3.11.0 nuclei_3.11.0_linux_amd64.zip" \
          "subfinder v2.15.0 subfinder_2.15.0_linux_amd64.zip" \
