@@ -587,6 +587,10 @@ class LiveInstaller:
         full_env["PATH"] = f"{Path.home() / '.local/bin'}:{full_env.get('PATH', '')}"
         if env:
             full_env.update(env)
+        # Running as root (e.g. bare SSH server): sudo may not even be
+        # installed. Strip the prefix - root needs no escalation.
+        if os.geteuid() == 0:
+            cmd = cmd.replace("sudo ", "")
         use_sudo = bool(self.sudo_password) and "sudo " in cmd
         shell_cmd = cmd.replace("sudo ", "sudo -S -p '' ") if use_sudo else cmd
         stdin = asyncio.subprocess.PIPE if use_sudo else None

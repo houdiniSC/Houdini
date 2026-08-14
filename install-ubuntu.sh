@@ -101,6 +101,34 @@ for b in curl git; do
   command -v "$b" >/dev/null 2>&1 || { echo "✗ missing: $b"; exit 1; }
 done
 
+# root (e.g. bare SSH server) may not have sudo installed - empty prefix
+if [ "$(id -u)" = 0 ]; then SUDO=""; else SUDO="sudo"; fi
+
+# ── 0) UI: prefer the shared Textual TUI (same professional wizard as the
+# WSL install), also over SSH. The whiptail flow below is only a fallback
+# for machines where the TUI cannot start (no python3 / pip blocked).
+# HOUDINI_NO_TUI=1 forces the classic whiptail wizard.
+TUI_FAILED=0
+if [ "${HOUDINI_NO_TUI:-0}" != "1" ] && [ -f "$SCRIPT_DIR/src/installer-tui.py" ]; then
+  TUI_VENV="$HOME/.houdini-tui-venv"
+  if [ ! -x "$TUI_VENV/bin/python" ]; then
+    command -v python3 >/dev/null 2>&1 || $SUDO apt-get install -y -qq python3 python3-venv >> "$LOG" 2>&1
+    python3 -m venv "$TUI_VENV" >> "$LOG" 2>&1 || TUI_FAILED=1
+  fi
+  if [ "$TUI_FAILED" = 0 ]; then
+    "$TUI_VENV/bin/pip" install -q textual cryptography >> "$LOG" 2>&1 || TUI_FAILED=1
+  fi
+  if [ "$TUI_FAILED" = 0 ]; then
+    export HOUDINI_PACK_DIR="$PACK_DIR"
+    exec "$TUI_VENV/bin/python" "$SCRIPT_DIR/src/installer-tui.py"
+    # exec failed - drop to the whiptail wizard
+    TUI_FAILED=1
+  fi
+fi
+if [ "$TUI_FAILED" = 1 ]; then
+  ui_box "Fallback" 8 60 "The graphical wizard could not start - continuing with this terminal wizard."
+fi
+
 # ── 1) Hermes core ─────────────────────────────────────────────────────────
 if command -v hermes >/dev/null 2>&1; then
   ui_info "Hermes" "✓ Hermes found: $(hermes --version 2>/dev/null | head -1)"
@@ -118,8 +146,8 @@ fi
 
 # ── 2) Security toolchain ──────────────────────────────────────────────────
 ui_info "Tools" "Installing apt tools (nmap, nikto, sqlmap ...)"
-sudo apt-get update -qq >> "$LOG" 2>&1
-sudo apt-get install -y -qq nmap nikto sqlmap gobuster ffuf whatweb dnsutils \
+$SUDO apt-get update -qq >> "$LOG" 2>&1
+$SUDO apt-get install -y -qq nmap nikto sqlmap gobuster ffuf whatweb dnsutils \
   netcat-openbsd jq unzip openvpn python3.12-dev >> "$LOG" 2>&1
 
 for p in "nuclei v3.11.0 nuclei_3.11.0_linux_amd64.zip" \
@@ -141,9 +169,9 @@ command -v ngrok >/dev/null 2>&1 || {
 export PATH="$HERMES_HOME/bin:$PATH"
 command -v droopescan >/dev/null 2>&1 || {
   ui_info "Tools" "Installing droopescan + drupwn (pip)..."
-  sudo python3 -m pip install --break-system-packages droopescan >> "$LOG" 2>&1
-  sudo python3 -m pip install --break-system-packages 'setuptools<81' >> "$LOG" 2>&1
-  sudo python3 -m pip install --break-system-packages --no-build-isolation git+https://github.com/immunIT/drupwn >> "$LOG" 2>&1
+  $SUDO python3 -m pip install --break-system-packages droopescan >> "$LOG" 2>&1
+  $SUDO python3 -m pip install --break-system-packages 'setuptools<81' >> "$LOG" 2>&1
+  $SUDO python3 -m pip install --break-system-packages --no-build-isolation git+https://github.com/immunIT/drupwn >> "$LOG" 2>&1
 }
 
 ui_info "Tools" "Updating nuclei templates..."
@@ -176,31 +204,31 @@ if ask_tool "Browser Capture" "Install browser-capture (Playwright + Chromium + 
   ui_info "Tools" "Installing browser-capture (playwright + mitmproxy)..."
   python3 -m venv "$HOME/browser-venv"
   "$HOME/browser-venv/bin/pip" install -q playwright mitmproxy >> "$LOG" 2>&1
-  sudo "$HOME/browser-venv/bin/playwright" install --with-deps chromium >> "$LOG" 2>&1
+  $SUDO "$HOME/browser-venv/bin/playwright" install --with-deps chromium >> "$LOG" 2>&1
   printf '#!/usr/bin/env bash\nexec %s %s "$@"\n' \
     "$HOME/browser-venv/bin/python" "$HERMES_HOME/toolkit/tools/browser-capture.py" \
-    | sudo tee /usr/local/bin/browser-capture >/dev/null
-  sudo chmod +x /usr/local/bin/browser-capture
+    | $SUDO tee /usr/local/bin/browser-capture >/dev/null
+  $SUDO chmod +x /usr/local/bin/browser-capture
   ui_info "Tools" "browser-capture ready"
 fi
 
 # mobile toolchain: apktool + jadx + frida (APK testing)
 if ask_tool "Mobile Tools" "Install APK tools (apktool + jadx + frida/objection)?"; then
   ui_info "Tools" "Installing mobile tools..."
-  sudo apt-get install -y -qq apktool openjdk-17-jre-headless jadx >> "$LOG" 2>&1
+  $SUDO apt-get install -y -qq apktool openjdk-17-jre-headless jadx >> "$LOG" 2>&1
   command -v apktool >/dev/null 2>&1 || {
     curl -fsSL -o /tmp/apktool.jar https://github.com/iBotPeaches/Apktool/releases/latest/download/apktool.jar
-    sudo cp /tmp/apktool.jar /usr/local/bin/
-    printf '#!/usr/bin/env bash\nexec java -jar /usr/local/bin/apktool.jar "$@"\n' | sudo tee /usr/local/bin/apktool >/dev/null
-    sudo chmod +x /usr/local/bin/apktool
+    $SUDO cp /tmp/apktool.jar /usr/local/bin/
+    printf '#!/usr/bin/env bash\nexec java -jar /usr/local/bin/apktool.jar "$@"\n' | $SUDO tee /usr/local/bin/apktool >/dev/null
+    $SUDO chmod +x /usr/local/bin/apktool
   }
   command -v jadx >/dev/null 2>&1 || {
     curl -fsSL -o /tmp/jadx.zip https://github.com/skylot/jadx/releases/download/v1.5.0/jadx-1.5.0.zip
-    sudo unzip -o -q /tmp/jadx.zip -d /opt/jadx
-    sudo chmod +x /opt/jadx/bin/jadx
-    sudo ln -sf /opt/jadx/bin/jadx /usr/local/bin/jadx
+    $SUDO unzip -o -q /tmp/jadx.zip -d /opt/jadx
+    $SUDO chmod +x /opt/jadx/bin/jadx
+    $SUDO ln -sf /opt/jadx/bin/jadx /usr/local/bin/jadx
   }
-  sudo python3 -m pip install --break-system-packages -q frida-tools objection >> "$LOG" 2>&1
+  $SUDO python3 -m pip install --break-system-packages -q frida-tools objection >> "$LOG" 2>&1
   ui_info "Tools" "Mobile tools ready"
 fi
 
@@ -320,8 +348,8 @@ case "$SUDO_MODE" in
 esac
 if [ -n "$SUDOERS_LINE" ]; then
   ui_info "Sudo" "Writing agent permissions to /etc/sudoers.d (your password may be asked once)..."
-  printf '%s\n' "$SUDOERS_LINE" | sudo tee "/etc/sudoers.d/hermes-$USER" >/dev/null 2>>"$LOG" \
-    && sudo chmod 440 "/etc/sudoers.d/hermes-$USER" >> "$LOG" 2>&1 \
+  printf '%s\n' "$SUDOERS_LINE" | $SUDO tee "/etc/sudoers.d/hermes-$USER" >/dev/null 2>>"$LOG" \
+    && $SUDO chmod 440 "/etc/sudoers.d/hermes-$USER" >> "$LOG" 2>&1 \
     && echo "sudoers written: /etc/sudoers.d/hermes-$USER" >> "$LOG" \
     || ui_box "Sudo" 8 60 "✗ Could not write sudo permissions — add them manually later."
 fi
