@@ -15,6 +15,7 @@ import os
 import re
 import shlex
 import shutil
+import sys
 from pathlib import Path
 from typing import Callable
 
@@ -646,14 +647,14 @@ class LiveInstaller:
             # wizard reads /dev/tty directly, so it must be skipped explicitly
             # with --skip-setup (our installer writes config.yaml itself).
             #
-            # install.sh hardcodes PYTHON_VERSION="3.11". Ubuntu 24.04 only
-            # ships 3.12, so uv would download a python-build-standalone
-            # tarball from GitHub (~200MB, flaky). Patch the script to use
-            # the apt-provided 3.12 instead: uv python find 3.12 resolves to
-            # /usr/bin/python3.12 and nothing is downloaded.
+            # install.sh hardcodes PYTHON_VERSION="3.11". Do not pin any
+            # version: use whatever Python this system already has (Ubuntu
+            # 24.04 -> 3.12, 25.04 -> 3.14, ...). uv python find <that>
+            # resolves locally - no python-build-standalone tarball download.
+            _py_ver = f"{sys.version_info.major}.{sys.version_info.minor}"
             return await self._sh(
                 "curl -fsSL https://hermes-agent.nousresearch.com/install.sh "
-                "| sed 's/^PYTHON_VERSION=\"3.11\"/PYTHON_VERSION=\"3.12\"/' "
+                f"| sed 's/^PYTHON_VERSION=\"3.11\"/PYTHON_VERSION=\"{_py_ver}\"/' "
                 "| bash -s -- --non-interactive --skip-setup"
             )
 

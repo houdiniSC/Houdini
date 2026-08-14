@@ -113,14 +113,21 @@ TUI_ERR=""
 if [ "${HOUDINI_NO_TUI:-0}" != "1" ] && [ -f "$SCRIPT_DIR/src/installer-tui.py" ]; then
   TUI_VENV="$HOME/.houdini-tui-venv"
   if [ ! -x "$TUI_VENV/bin/python" ]; then
-    command -v python3 >/dev/null 2>&1 || $SUDO apt-get install -y -qq python3 python3-venv >> "$LOG" 2>&1
+    command -v python3 >/dev/null 2>&1 || $SUDO apt-get install -y -qq python3 python3-venv python3-pip >> "$LOG" 2>&1
     python3 -m venv "$TUI_VENV" >> "$LOG" 2>&1 || {
       # minimal Ubuntu images ship python3 without python3-venv - install and
       # retry once before giving up
       TUI_ERR=$(tail -n 3 "$LOG" | tr '\n' ' ')
-      $SUDO apt-get install -y -qq python3-venv >> "$LOG" 2>&1
+      $SUDO apt-get install -y -qq python3-venv python3-pip >> "$LOG" 2>&1
       python3 -m venv "$TUI_VENV" >> "$LOG" 2>&1 || { TUI_FAILED=1; TUI_ERR=$(tail -n 3 "$LOG" | tr '\n' ' '); }
     }
+  fi
+  # venv created without pip on minimal images (ensurepip missing) - fix it
+  if [ "$TUI_FAILED" = 0 ] && [ ! -x "$TUI_VENV/bin/pip" ]; then
+    TUI_ERR="venv has no pip (ensurepip missing)"
+    $SUDO apt-get install -y -qq python3-venv python3-pip >> "$LOG" 2>&1
+    rm -rf "$TUI_VENV"
+    python3 -m venv "$TUI_VENV" >> "$LOG" 2>&1 || { TUI_FAILED=1; TUI_ERR=$(tail -n 3 "$LOG" | tr '\n' ' '); }
   fi
   if [ "$TUI_FAILED" = 0 ]; then
     "$TUI_VENV/bin/pip" install -q textual cryptography >> "$LOG" 2>&1 \
@@ -150,12 +157,13 @@ if command -v hermes >/dev/null 2>&1; then
   ui_info "Hermes" "✓ Hermes found: $(hermes --version 2>/dev/null | head -1)"
 else
   ui_info "Hermes" "Installing Hermes Agent..."
-  # install.sh hardcodes PYTHON_VERSION="3.11"; Ubuntu 24.04 ships only 3.12,
-  # so uv would download a python-build-standalone tarball from GitHub
-  # (~200MB, flaky on slow links). Patch the script to use the apt 3.12:
-  # uv python find 3.12 resolves to /usr/bin/python3.12, nothing downloads.
+  # install.sh hardcodes PYTHON_VERSION="3.11". Do not pin any version:
+  # use whatever Python this system already has (Ubuntu 24.04 -> 3.12,
+  # 25.04 -> 3.14, ...). uv python find <that> resolves locally - no
+  # python-build-standalone tarball download from GitHub.
+  PY_VER="$(python3 -c 'import sys; print(f"{sys.version_info.major}.{sys.version_info.minor}")' 2>/dev/null || echo 3.12)"
   curl -fsSL https://hermes-agent.nousresearch.com/install.sh \
-    | sed 's/^PYTHON_VERSION="3.11"/PYTHON_VERSION="3.12"/' \
+    | sed "s/^PYTHON_VERSION=\"3.11\"/PYTHON_VERSION=\"$PY_VER\"/" \
     | bash -s -- --non-interactive --skip-setup >> "$LOG" 2>&1 \
     || { ui_box "Error" 8 60 "✗ Hermes install failed — see $LOG"; exit 1; }
 fi
