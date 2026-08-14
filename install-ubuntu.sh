@@ -109,24 +109,40 @@ if [ "$(id -u)" = 0 ]; then SUDO=""; else SUDO="sudo"; fi
 # for machines where the TUI cannot start (no python3 / pip blocked).
 # HOUDINI_NO_TUI=1 forces the classic whiptail wizard.
 TUI_FAILED=0
+TUI_ERR=""
 if [ "${HOUDINI_NO_TUI:-0}" != "1" ] && [ -f "$SCRIPT_DIR/src/installer-tui.py" ]; then
   TUI_VENV="$HOME/.houdini-tui-venv"
   if [ ! -x "$TUI_VENV/bin/python" ]; then
     command -v python3 >/dev/null 2>&1 || $SUDO apt-get install -y -qq python3 python3-venv >> "$LOG" 2>&1
-    python3 -m venv "$TUI_VENV" >> "$LOG" 2>&1 || TUI_FAILED=1
+    python3 -m venv "$TUI_VENV" >> "$LOG" 2>&1 || {
+      # minimal Ubuntu images ship python3 without python3-venv - install and
+      # retry once before giving up
+      TUI_ERR=$(tail -n 3 "$LOG" | tr '\n' ' ')
+      $SUDO apt-get install -y -qq python3-venv >> "$LOG" 2>&1
+      python3 -m venv "$TUI_VENV" >> "$LOG" 2>&1 || { TUI_FAILED=1; TUI_ERR=$(tail -n 3 "$LOG" | tr '\n' ' '); }
+    }
   fi
   if [ "$TUI_FAILED" = 0 ]; then
-    "$TUI_VENV/bin/pip" install -q textual cryptography >> "$LOG" 2>&1 || TUI_FAILED=1
+    "$TUI_VENV/bin/pip" install -q textual cryptography >> "$LOG" 2>&1 \
+      || { TUI_FAILED=1; TUI_ERR=$(tail -n 3 "$LOG" | tr '\n' ' '); }
   fi
   if [ "$TUI_FAILED" = 0 ]; then
     export HOUDINI_PACK_DIR="$PACK_DIR"
-    exec "$TUI_VENV/bin/python" "$SCRIPT_DIR/src/installer-tui.py"
-    # exec failed - drop to the whiptail wizard
+    # Run the TUI. If it exits cleanly it performed the full install - stop.
+    # Non-zero = it crashed before taking over - fall back to whiptail.
+    if "$TUI_VENV/bin/python" "$SCRIPT_DIR/src/installer-tui.py" 2> /tmp/houdini-tui.err; then
+      exit 0
+    fi
     TUI_FAILED=1
+    TUI_ERR=$(tail -n 5 /tmp/houdini-tui.err 2>/dev/null | tr '\n' ' ')
+    rm -f /tmp/houdini-tui.err
   fi
 fi
 if [ "$TUI_FAILED" = 1 ]; then
-  ui_box "Fallback" 8 60 "The graphical wizard could not start - continuing with this terminal wizard."
+  ui_box "Fallback" 12 70 "The graphical wizard could not start. Reason:
+${TUI_ERR:-unknown (see $LOG)}
+
+Continuing with this terminal wizard."
 fi
 
 # ── 1) Hermes core ─────────────────────────────────────────────────────────
