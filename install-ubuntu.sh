@@ -153,6 +153,11 @@ if [ "${HOUDINI_NO_TUI:-0}" != "1" ] && [ -f "$SCRIPT_DIR/src/installer-tui.py" 
   fi
   if [ "$TUI_FAILED" = 0 ]; then
     export HOUDINI_PACK_DIR="$PACK_DIR"
+    # TERM=dumb (bare SSH, some web consoles) breaks both Textual and
+    # whiptail - degrade to a capable xterm so the TUI can draw at all.
+    case "${TERM:-}" in
+      dumb|""|unknown) export TERM=xterm-256color ;;
+    esac
     # Run the TUI. Textual draws on stderr, so a Traceback there means it
     # crashed before taking over. Three outcomes:
     #   - exit 0: install done (or user quit from the wizard) -> stop here
