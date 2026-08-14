@@ -167,13 +167,23 @@ if [ "${HOUDINI_NO_TUI:-0}" != "1" ] && [ -f "$SCRIPT_DIR/src/installer-tui.py" 
   fi
   if [ "$TUI_FAILED" = 0 ]; then
     export HOUDINI_PACK_DIR="$PACK_DIR"
-    # Run the TUI. If it exits cleanly it performed the full install - stop.
-    # Non-zero = it crashed before taking over - fall back to whiptail.
-    if "$TUI_VENV/bin/python" "$SCRIPT_DIR/src/installer-tui.py" 2> /tmp/houdini-tui.err; then
+    # Run the TUI. Textual draws on stderr, so a Traceback there means it
+    # crashed before taking over. Three outcomes:
+    #   - exit 0: install done (or user quit from the wizard) -> stop here
+    #   - non-zero + Traceback in stderr: real startup failure -> whiptail
+    #   - non-zero without Traceback (Ctrl+Q): user quit -> stop, no whiptail
+    "$TUI_VENV/bin/python" "$SCRIPT_DIR/src/installer-tui.py" 2> /tmp/houdini-tui.err
+    TUI_RC=$?
+    if [ "$TUI_RC" = 0 ]; then
       exit 0
     fi
-    TUI_FAILED=1
-    TUI_ERR=$(tail -n 5 /tmp/houdini-tui.err 2>/dev/null | tr '\n' ' ')
+    if grep -qE "Traceback|ModuleNotFoundError|ImportError|SyntaxError" /tmp/houdini-tui.err; then
+      TUI_FAILED=1
+      TUI_ERR=$(grep -E "Traceback|ModuleNotFoundError|ImportError|Error:" /tmp/houdini-tui.err | tail -3 | tr '\n' ' ')
+    else
+      # User quit the wizard (Ctrl+Q / Esc) - honor it, never start whiptail
+      exit 0
+    fi
     rm -f /tmp/houdini-tui.err
   fi
 fi
