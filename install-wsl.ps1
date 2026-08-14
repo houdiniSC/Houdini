@@ -306,6 +306,30 @@ irm `"`$src\install-wsl.ps1`" | iex"
         }
     }
 
+    # ---- 2b) Update mode (distro exists, rootfs cached) ------------------
+    # Default when the distro is already present: never re-import. Instead,
+    # copy the fresh package (src/, knowledge-pack/) into the distro and run
+    # the updated TUI from there -- no unregister, no reinstall, no download.
+    $rootfsCached = (Test-Path (Join-Path $env:TEMP "hermes-rootfs.tar.gz")) -or
+                    ($RootfsPath -and (Test-Path $RootfsPath))
+    $Update = $true
+    if ($existing) {
+        if ($rootfsCached) {
+            Log "Distro '$Distro' exists with cached rootfs -- UPDATE mode (copy package, keep everything)."
+        } else {
+            Log "Distro '$Distro' exists -- UPDATE mode (rootfs not cached; package updated in place)."
+        }
+        $guestDir = "/home/hermes/houdini"
+        $wslDrive = $InstallerDir.Substring(0, 1).ToLowerInvariant()
+        $wslRest = $InstallerDir.Substring(2).Replace("\", "/")
+        $wslPkg = "/mnt/$wslDrive$wslRest"
+        Log "Syncing package into '$Distro' ($guestDir) ..."
+        wsl -d $Distro -u hermes -- bash -lc "mkdir -p '$guestDir' && rsync -a --delete '$wslPkg/src/' '$guestDir/src/' 2>/dev/null || cp -a '$wslPkg/src' '$guestDir/' ; mkdir -p '$guestDir/knowledge-pack' && cp -a '$wslPkg/knowledge-pack/.' '$guestDir/knowledge-pack/' 2>/dev/null ; cp -f '$wslPkg/install-ubuntu.sh' '$guestDir/' 2>/dev/null || true"
+        if ($LASTEXITCODE -ne 0) {
+            Log "WARNING: package sync reported an error -- continuing with the mounted path."
+        }
+    }
+
     # ---- 3) Inside setup: systemd + agent user + deps --------------------
     Log "Configuring systemd and the agent user inside '$Distro'..."
     $setup = @'
@@ -315,13 +339,18 @@ printf '[boot]\nsystemd=true\n' > /etc/wsl.conf
 id hermes >/dev/null 2>&1 || useradd -m -s /bin/bash hermes
 printf 'hermes ALL=(ALL) NOPASSWD: SETENV: ALL\n' > /etc/sudoers.d/hermes-bootstrap
 chmod 440 /etc/sudoers.d/hermes-bootstrap
-apt-get update -qq
-apt-get install -y -qq python3 python3-pip python3-venv curl git unzip
+# fast path on re-runs: skip apt when the installer venv already exists
+if [ -x /home/hermes/hermes-venv/bin/python ]; then
+    :
+else
+    apt-get update -qq
+    apt-get install -y -qq python3 python3-pip python3-venv curl git unzip
+fi
 # isolated venv for the installer: system pip conflicts with Debian packages
 if [ ! -x /home/hermes/hermes-venv/bin/python ]; then
     python3 -m venv /home/hermes/hermes-venv
 fi
-/home/hermes/hermes-venv/bin/pip install -q textual cryptography
+/home/hermes/hermes-venv/bin/pip install -q textual cryptography 2>/dev/null || true
 loginctl enable-linger hermes 2>/dev/null || true
 '@
     # wsl.exe mangles multi-line / quoted arguments passed to `bash -c`
@@ -350,6 +379,18 @@ loginctl enable-linger hermes 2>/dev/null || true
     $rest = $InstallerDir.Substring(2).Replace("\", "/")
     $installerPath = "/mnt/$drive$rest/src"
     $py = "/home/hermes/hermes-venv/bin/python"
+
+    # Update mode: prefer the synced copy inside the distro (fresh code,
+    # no dependence on the mounted Windows path staying put).
+    if ($existing) {
+        $guestSrc = "/home/hermes/houdini/src"
+        if (wsl -d $Distro -u hermes -- bash -lc "test -f '$guestSrc/installer-tui.py'") {
+            $installerPath = $guestSrc
+            Log "Using updated package inside the distro ($guestSrc)."
+        } else {
+            Log "No synced copy found -- falling back to the mounted path."
+        }
+    }
 
     Log "Starting the Houdini terminal installer inside '$Distro'..."
     Log "Run the wizard directly in this terminal (Textual TUI)."
