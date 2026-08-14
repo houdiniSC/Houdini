@@ -127,6 +127,7 @@ make_venv() {
   if python3 -m venv "$venv" >> "$LOG" 2>&1 && [ -x "$venv/bin/pip" ]; then
     return 0
   fi
+  echo "[houdini] Installing python3-venv packages (first run)..."
   ensure_venv_pkgs || return 1
   rm -rf "$venv"
   python3 -m venv "$venv" >> "$LOG" 2>&1 && [ -x "$venv/bin/pip" ]
@@ -148,8 +149,12 @@ if [ "${HOUDINI_NO_TUI:-0}" != "1" ] && [ -f "$SCRIPT_DIR/src/installer-tui.py" 
     fi
   fi
   if [ "$TUI_FAILED" = 0 ]; then
+    # First run downloads the Textual UI packages - print progress instead
+    # of leaving the user staring at a silent blue terminal.
+    echo "[houdini] Preparing the wizard (first run installs UI packages - may take a minute)..."
     "$TUI_VENV/bin/pip" install -q textual cryptography >> "$LOG" 2>&1 \
       || { TUI_FAILED=1; TUI_ERR=$(tail -n 3 "$LOG" | tr '\n' ' '); }
+    echo "[houdini] Starting the wizard..."
   fi
   if [ "$TUI_FAILED" = 0 ]; then
     export HOUDINI_PACK_DIR="$PACK_DIR"
