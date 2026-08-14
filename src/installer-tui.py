@@ -87,10 +87,11 @@ TOOL_CATS = list(dict.fromkeys(cat for _name, _desc, cat in TOOLS))
 STEP_DEFS = [
     ("welcome", "Welcome"),
     ("config", "Load config"),
-    ("core", "Core setup"),
+    ("core", "AI provider"),
+    ("telegram", "Telegram"),
     ("decide", "Options"),
     ("tools", "Toolchain"),
-    ("secrets", "Secrets"),
+    ("secrets", "API keys"),
     ("sudo", "Permissions"),
     ("webui", "WebUI"),
     ("memory", "Memory"),
@@ -102,7 +103,8 @@ STEP_DEFS = [
 STEP_HINTS = {
     "welcome": "Press Start Installation to begin.",
     "config": "Optional: paste a local path or an http(s) URL, then Load & Apply.",
-    "core": "Required: pick an AI provider, choose the model and enter its API key. Bot token starts the gateway. Everything else can be added later.",
+    "core": "Pick an AI provider, choose the model and enter its API key.",
+    "telegram": "Bot token from @BotFather + your Telegram user IDs (security gate).",
     "decide": "All tools install by default. Continue to customize, or Quick Install with defaults.",
     "tools": "Pick a tool category on the left; check the tools you want.",
     "secrets": "One key per service; empty fields are skipped and added later.",
@@ -140,24 +142,17 @@ class WizardScreen(Screen):
                     with Vertical(id="step-welcome", classes="step"):
                         yield Static("", id="welcome_gradient")
                         yield Static(
-                            "      /\\\n"
-                            "     /  \\\n"
-                            "    / /\\ \\\n"
-                            "   / /__\\ \\\n"
-                            "  /________\\\n"
-                            " /__________\\\n"
-                            "/____________\\\n"
-                            "\\____________/",
-                            id="hat_logo",
-                        )
-                        yield Static(
                             "█ █ ███ █ █ ██  ███ █ █\n"
                             "███ █ █ █ █ █ █  █   ███\n"
                             "█ █ ███ █ █ ██  ███ █ █",
                             id="content_logo",
                         )
                         yield Static(
-                            "The security wizard for testing web apps & sites",
+                            "HOUDINI",
+                            id="welcome_title",
+                        )
+                        yield Static(
+                            "Security gateway bootstrap for web & mobile testing",
                             id="content_sub",
                         )
                         yield Static(
@@ -165,11 +160,11 @@ class WizardScreen(Screen):
                             id="welcome_arabic",
                         )
                         yield Static(
-                            f"- [{EMERALD}]+[/] Live apt / binary installation\n"
-                            f"- [{EMERALD}]+[/] Dynamic tool & key inventory\n"
-                            f"- [{EMERALD}]+[/] Masked secrets entry\n"
-                            f"- [{EMERALD}]+[/] Encrypted config load (path or URL)\n"
-                            f"- [{EMERALD}]+[/] Gateway ready on first run",
+                            f"[{EMERALD}]●[/] Live apt / binary installation\n"
+                            f"[{EMERALD}]●[/] Dynamic tool & key inventory\n"
+                            f"[{EMERALD}]●[/] Masked secrets entry\n"
+                            f"[{EMERALD}]●[/] Encrypted config load (path or URL)\n"
+                            f"[{EMERALD}]●[/] Gateway ready on first run",
                             id="welcome_features",
                         )
                         yield Button(
@@ -178,7 +173,7 @@ class WizardScreen(Screen):
                             variant="primary",
                         )
                         yield Static(
-                            f"[{SLATE}]Your sudo password may be requested once during installation.[/]",
+                            f"[{SLATE_DIM}]Your sudo password may be requested once during installation.[/]",
                             id="welcome_note",
                         )
                     with Vertical(id="step-config", classes="step"):
@@ -202,10 +197,7 @@ class WizardScreen(Screen):
                         yield Static("", id="cfg_status")
                     with Vertical(id="step-core", classes="step"):
                         yield Static(
-                            "Pick an AI provider, choose the model and enter its "
-                            "API key.\nThe Telegram bot token is needed for the "
-                            "gateway to start.\nEverything else (home channel, API "
-                            "keys, tools) can be added or detected later.",
+                            "Pick an AI provider, choose the model and enter its API key.",
                             classes="hint",
                         )
                         yield RadioSet(
@@ -232,12 +224,27 @@ class WizardScreen(Screen):
                             placeholder="Model ID (pick from the list or type custom)",
                             id="model",
                         )
+                        yield Static("", id="core_status")
+                    with Vertical(id="step-telegram", classes="step"):
+                        yield Static(
+                            "Telegram gateway setup. The bot token starts the gateway; "
+                            "allowed user IDs gate who can talk to it.",
+                            classes="hint",
+                        )
                         yield Input(
                             placeholder="Telegram bot token (@BotFather)",
                             password=True,
                             id="bot",
                         )
-                        yield Static("", id="core_status")
+                        yield Input(
+                            placeholder="Allowed Telegram user IDs (comma-separated, e.g. 123456789,987654321)",
+                            id="users",
+                        )
+                        yield Static(
+                            f"[{SLATE_DIM}]Find your user ID: message @userinfobot on Telegram.[/]",
+                            id="telegram_hint",
+                        )
+                        yield Static("", id="telegram_status")
                     with Vertical(id="step-decide", classes="step"):
                         yield Static(
                             "All tools install by default with the full toolkit.\n"
@@ -408,6 +415,23 @@ class WizardScreen(Screen):
             self._fill_review()
         if step == "summary":
             self._fill_summary()
+        # Auto-refresh live model list when returning to core with credentials
+        if step == "core" and not self.app.dry_run:
+            api_key = self.query_one("#api_key", Input).value.strip()
+            base_url = self.query_one("#model_base_url", Input).value.strip()
+            provider = self._selected_provider()
+            preset = MODEL_PROVIDERS.get(provider, MODEL_PROVIDERS["custom"])
+            # Refresh if we have an API key and a base URL (or preset has one)
+            if api_key and (base_url or preset["base_url"]):
+                self.run_worker(self._refresh_model_list(provider))
+        # Telegram step: pre-fill from data if returning
+        if step == "telegram":
+            bot = self.app.data.get("secrets", {}).get("bot", "")
+            users = self.app.data.get("secrets", {}).get("users", "")
+            if bot:
+                self.query_one("#bot", Input).value = bot
+            if users:
+                self.query_one("#users", Input).value = users
 
     def _update_sidebar(self) -> None:
         idx = self._step_index(self.current)
@@ -505,6 +529,22 @@ class WizardScreen(Screen):
                     return
             self.query_one("#core_status", Static).update("")
             self._collect_core()
+            await self._show("telegram")
+        elif self.current == "telegram":
+            bot = self.query_one("#bot", Input).value.strip()
+            users = self.query_one("#users", Input).value.strip()
+            if not bot:
+                self.query_one("#telegram_status", Static).update(
+                    f"[{RED}]Bot token is required.[/]"
+                )
+                return
+            if not users:
+                self.query_one("#telegram_status", Static).update(
+                    f"[{AMBER}]Warning: no allowed user IDs — anyone can talk to the bot.[/]"
+                )
+            else:
+                self.query_one("#telegram_status", Static).update("")
+            self._collect_telegram()
             await self._show("decide")
         elif self.current == "tools":
             self._collect_tools()
@@ -565,7 +605,7 @@ class WizardScreen(Screen):
 
         secrets_cfg = cfg.get("secrets") or {}
         count = 0
-        core_inputs = {"model", "model_base_url", "api_key", "bot"}
+        core_inputs = {"model", "model_base_url", "api_key", "bot", "users"}
         for _g, fid, _label, _secret, _targets in SECRET_FIELDS:
             val = str(secrets_cfg.get(fid, "") or "").strip()
             if val:
@@ -701,23 +741,30 @@ class WizardScreen(Screen):
         secrets = self.app.data["secrets"]
         provider = self._selected_provider()
         select = self.query_one("#model_select", Select)
+        model_input = self.query_one("#model", Input)
+        # If user picked a preset model from the dropdown, copy it into the input
         if select.value not in (Select.BLANK, Select.NULL, "__custom__"):
-            model_input = self.query_one("#model", Input)
             if not model_input.value.strip():
                 model_input.value = str(select.value)
-        self._apply_model_preset(provider, refresh=False)
+        # Never call _apply_model_preset here — it resets model_input to
+        # default_model (empty for custom) and would wipe the user's choice.
         secrets["model_provider"] = provider
-        secrets["model"] = self.query_one("#model", Input).value.strip()
+        secrets["model"] = model_input.value.strip()
         secrets["model_base_url"] = self.query_one(
             "#model_base_url", Input
         ).value.strip()
         secrets["api_key"] = self.query_one("#api_key", Input).value.strip()
+        self.app.data["secrets_count"] = self._count_secrets()
+
+    def _collect_telegram(self) -> None:
+        secrets = self.app.data["secrets"]
         secrets["bot"] = self.query_one("#bot", Input).value.strip()
+        secrets["users"] = self.query_one("#users", Input).value.strip()
         self.app.data["secrets_count"] = self._count_secrets()
 
     def _collect_secrets(self) -> None:
         for _group, fid, _label, _secret, _targets in SECRET_FIELDS:
-            if fid in ("model_provider", "model", "model_base_url", "api_key", "bot"):
+            if fid in ("model_provider", "model", "model_base_url", "api_key", "bot", "users"):
                 continue
             self.app.data["secrets"][fid] = self.query_one(f"#{fid}", Input).value.strip()
         self.app.data["secrets_count"] = self._count_secrets()
@@ -740,6 +787,8 @@ class WizardScreen(Screen):
         """Persist the current step's inputs before navigating away (tabs/back)."""
         if self.current == "core":
             self._collect_core()
+        elif self.current == "telegram":
+            self._collect_telegram()
         elif self.current == "tools":
             self._collect_tools()
         elif self.current == "secrets":
@@ -854,8 +903,10 @@ class WizardScreen(Screen):
         )
         api_key = data.get("secrets", {}).get("api_key", "")
         bot = data.get("secrets", {}).get("bot", "")
+        users = data.get("secrets", {}).get("users", "")
         table.add_row("API key", mask(api_key) if api_key else "not set")
         table.add_row("Bot token", mask(bot) if bot else "not set")
+        table.add_row("Allowed users", users if users else "not set (open)")
         table.add_row("Sudo mode", mode_label)
         table.add_row("Personality", "set at first conversation (agent name + style)")
         webui = data.get("webui", True)
@@ -878,11 +929,15 @@ class WizardScreen(Screen):
     @staticmethod
     def _colorize(line: str) -> str:
         if line.startswith("o"):
-            return f"[bold {CYAN}]{line}[/]"
+            return f"[bold {CYAN}]▶ {line[1:].strip()}[/]"
         if line.startswith("x"):
-            return f"[bold {RED}]{line}[/]"
+            return f"[bold {RED}]✗ {line[1:].strip()}[/]"
         if line.startswith("v"):
-            return f"[{EMERALD}]{line}[/]"
+            return f"[{EMERALD}]✓ {line[1:].strip()}[/]"
+        if line.startswith("!"):
+            return f"[bold {AMBER}]⚠ {line[1:].strip()}[/]"
+        if line.startswith("i"):
+            return f"[{BLUE}]ℹ {line[1:].strip()}[/]"
         return line
 
     async def _run_install(self) -> None:
@@ -929,6 +984,7 @@ class WizardScreen(Screen):
         )
         api_key = data.get("secrets", {}).get("api_key", "")
         bot = data.get("secrets", {}).get("bot", "")
+        users = data.get("secrets", {}).get("users", "")
         log.write(
             f"[{SLATE}]API key:[/] "
             f"[{EMERALD}]{mask(api_key)}[/]" if api_key else f"[{RED}]API key: not set[/]"
@@ -936,6 +992,10 @@ class WizardScreen(Screen):
         log.write(
             f"[{SLATE}]Bot token:[/] "
             f"[{EMERALD}]{mask(bot)}[/]" if bot else f"[{RED}]Bot token: not set[/]"
+        )
+        log.write(
+            f"[{SLATE}]Allowed users:[/] "
+            f"[{EMERALD}]{users}[/]" if users else f"[{AMBER}]Allowed users: not set (open)[/]"
         )
         log.write(f"[{SLATE}]Personality:[/] asked at first conversation (name + style)")
         log.write(
@@ -1014,7 +1074,7 @@ class HoudiniInstaller(App):
     Button:hover { background: $primary; color: $background; }
 
     #step-welcome { align: center middle; }
-    #hat_logo { color: $accent; text-style: bold; margin-bottom: 1; }
+    #welcome_title { text-style: bold; color: $accent; text-align: center; margin-bottom: 0; }
     #content_logo { text-style: bold; color: $accent; text-align: center; }
     #content_sub { text-align: center; color: $text-muted; }
     #welcome_arabic { text-align: center; color: $text-muted; margin-bottom: 1; }
@@ -1042,6 +1102,8 @@ class HoudiniInstaller(App):
     #review_table { height: 100%; }
     #prog { margin: 0 0 1 0; }
     #log, #summary_log { height: 1fr; border: solid $primary; }
+    #telegram_hint { color: $text-muted; margin-top: 1; }
+    #telegram_status { margin-top: 1; }
     """
 
     def __init__(self, dry_run: bool = False) -> None:
@@ -1093,12 +1155,17 @@ async def selftest() -> None:
             assert len(sel._options) >= 4  # blank + curated presets + custom
             sel.value = "deepseek-v4-flash-free"
             await pilot.pause()
-            await press("next")  # core -> decide
+            await press("next")  # core -> telegram
+            app.screen.query_one("#bot", Input).value = "123:demo-token"
+            app.screen.query_one("#users", Input).value = "123456789"
+            await press("next")  # telegram -> decide
             assert app.screen.query_one("#decide_custom", Button) is not None
             assert app.screen.query_one("#decide_quick", Button) is not None
             assert app.data["secrets"]["model_provider"] == "opencode"
             assert app.data["secrets"]["model"] == "deepseek-v4-flash-free"
             assert app.data["secrets"]["model_base_url"] == "https://opencode.ai/zen/v1"
+            assert app.data["secrets"]["bot"] == "123:demo-token"
+            assert app.data["secrets"]["users"] == "123456789"
             app.screen.query_one("#decide_custom", Button).press()
             await pilot.pause()
             cats = app.screen.query_one("#tool_cats", ListView)
@@ -1124,7 +1191,7 @@ async def selftest() -> None:
                 await pilot.pause(0.1)
             await press("next")  # -> summary
             assert app.screen.query_one("#summary_log", RichLog) is not None
-            assert app.data["secrets_count"] == 2
+            assert app.data["secrets_count"] == 3  # api_key + bot + users
             assert app.data["sudo_mode"] == "restricted"
             assert app.data["tools"]["nuclei"] is True
         except Exception:
@@ -1142,14 +1209,16 @@ async def selftest() -> None:
         await press2("next")  # welcome -> config
         await press2("next")  # config (skip) -> core
         app2.screen.query_one("#api_key", Input).value = "sk-demo"
-        await press2("next")  # core -> decide
+        await press2("next")  # core -> telegram
+        app2.screen.query_one("#bot", Input).value = "123:demo"
+        await press2("next")  # telegram -> decide
         app2.screen.query_one("#decide_quick", Button).press()
         await pilot2.pause()
         assert app2.screen.query_one("#review_table", DataTable) is not None
         assert all(app2.data["tools"][n] for n, _d, _c in TOOLS)
         assert app2.data["secrets"]["api_key"] == "sk-demo"
         assert app2.data["secrets"]["model_provider"] == "deepseek"
-        assert app2.data["secrets_count"] == 1
+        assert app2.data["secrets_count"] == 2  # api_key + bot
 
     # custom-provider path: base URL + key + model must all reach secrets
     app3 = HoudiniInstaller(dry_run=True)
@@ -1168,13 +1237,16 @@ async def selftest() -> None:
                 break
         await pilot3.pause()
         app3.screen.query_one("#model_base_url", Input).value = "https://my-gw.example/v1"
-        app3.screen.query_one("#api_key", Input).value = "sk-custom-demo"
+        app3.screen.query_one("#api_key", Input).value = "«redacted:sk-…»"
         app3.screen.query_one("#model", Input).value = "my-custom-model"
-        await press3("next")  # core -> decide
+        await press3("next")  # core -> telegram
+        app3.screen.query_one("#bot", Input).value = "123:demo"
+        await press3("next")  # telegram -> decide
         assert app3.data["secrets"]["model_provider"] == "custom"
         assert app3.data["secrets"]["model"] == "my-custom-model"
         assert app3.data["secrets"]["model_base_url"] == "https://my-gw.example/v1"
-        assert app3.data["secrets"]["api_key"] == "sk-custom-demo"
+        assert app3.data["secrets"]["api_key"] == "«redacted:sk-…»"
+        assert app3.data["secrets"]["bot"] == "123:demo"
 
     # tab navigation must collect the current step's inputs before leaving
     app4 = HoudiniInstaller(dry_run=True)
@@ -1195,12 +1267,19 @@ async def selftest() -> None:
         app4.screen.query_one("#model_base_url", Input).value = "https://tab-gw.example/v1"
         app4.screen.query_one("#api_key", Input).value = "sk-tab-demo"
         app4.screen.query_one("#model", Input).value = "tab-model"
-        app4.screen.query_one("#step_tabs", Tabs).active = "decide"  # tab jump, not Next
+        app4.screen.query_one("#step_tabs", Tabs).active = "telegram"  # tab jump, not Next
         await pilot4.pause()
         assert app4.data["secrets"]["model_provider"] == "custom"
         assert app4.data["secrets"]["model"] == "tab-model"
         assert app4.data["secrets"]["model_base_url"] == "https://tab-gw.example/v1"
         assert app4.data["secrets"]["api_key"] == "sk-tab-demo"
+        # telegram step: fill bot + users, then jump to decide
+        app4.screen.query_one("#bot", Input).value = "123:tab"
+        app4.screen.query_one("#users", Input).value = "111,222"
+        app4.screen.query_one("#step_tabs", Tabs).active = "decide"
+        await pilot4.pause()
+        assert app4.data["secrets"]["bot"] == "123:tab"
+        assert app4.data["secrets"]["users"] == "111,222"
 
     # custom validation: Next must be blocked while required fields are empty
     app5 = HoudiniInstaller(dry_run=True)
@@ -1225,9 +1304,13 @@ async def selftest() -> None:
         status5 = app5.screen.query_one("#core_status", Static)
         assert "Model ID" in str(status5.content)
         app5.screen.query_one("#model", Input).value = "v-model"
-        await press5("next")  # now complete -> advances
+        await press5("next")  # now complete -> telegram
+        assert app5.screen.current == "telegram"
+        app5.screen.query_one("#bot", Input).value = "123:v"
+        await press5("next")  # telegram -> decide
         assert app5.screen.current == "decide"
         assert app5.data["secrets"]["model"] == "v-model"
+        assert app5.data["secrets"]["bot"] == "123:v"
     print("selftest OK")
 
 

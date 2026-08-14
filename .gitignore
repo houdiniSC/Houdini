@@ -5,6 +5,10 @@ secrets.env
 *.hcfg
 export-config.py
 config/
+creds.txt
+github-apikey.txt
+*.apikey
+*.token
 
 # large / dev artifacts
 rootfs/hermes-rootfs.tar.gz
