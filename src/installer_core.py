@@ -20,7 +20,12 @@ from typing import Callable
 
 # ── Paths ─────────────────────────────────────────────────────────────────
 SCRIPT_DIR = Path(__file__).resolve().parent
-PACK_DIR = SCRIPT_DIR.parent / "knowledge-pack"
+# Knowledge pack source: HOUDINI_PACK_DIR env override wins (set by the
+# installers when the TUI runs from a synced copy inside a distro and the
+# pack itself lives next to the original package), otherwise the folder
+# beside this script (normal local / native-Linux layout).
+_PACK_ENV = os.environ.get("HOUDINI_PACK_DIR", "").strip()
+PACK_DIR = Path(_PACK_ENV).expanduser() if _PACK_ENV else SCRIPT_DIR.parent / "knowledge-pack"
 HERMES_HOME = Path.home() / ".hermes"
 
 # ── Data ──────────────────────────────────────────────────────────────────
