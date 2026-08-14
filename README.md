@@ -54,8 +54,8 @@ cd Houdini
 bash install-ubuntu.sh
 ```
 
-It reads optional settings from `src/secrets.env` (copy
-`src/secrets.env.example`) and writes the install log to
+It reads optional settings from `config/secrets.env` (copy
+`src/secrets.env.example` there) and writes the install log to
 `/tmp/houdini-bootstrap.log`.
 
 ## Remove the distro
@@ -78,8 +78,8 @@ endpoint) and the Telegram bot token. Everything else is optional and
 can be detected or added later at first conversation.
 
 For a fast scripted install, copy `src/secrets.env.example` to
-`src/secrets.env` next to `install-ubuntu.sh` and fill the values — same
-field names as the wizard's encrypted `.hcfg` config.
+`config/secrets.env` (the `config/` folder is git-ignored) and fill the
+values — same field names as the wizard's encrypted `.hcfg` config.
 
 ## Security
 

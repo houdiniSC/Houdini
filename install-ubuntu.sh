@@ -7,7 +7,8 @@ set -uo pipefail
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 PACK_DIR="$SCRIPT_DIR/knowledge-pack"
-SECRETS_FILE="$SCRIPT_DIR/secrets.env"
+SECRETS_FILE="$SCRIPT_DIR/config/secrets.env"
+[ -f "$SECRETS_FILE" ] || SECRETS_FILE="$SCRIPT_DIR/src/secrets.env"
 HERMES_HOME="$HOME/.hermes"
 LOG="/tmp/houdini-bootstrap.log"
 : > "$LOG"
