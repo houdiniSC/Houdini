@@ -3,14 +3,19 @@
 telegram-admin.py - admin helpers for the Houdini Telegram gateway.
 
 Run with the Hermes venv python (it has the telegram library):
-    PY=$(dirname $(dirname $(readlink -f $(command -v hermes))))/venv/bin/python
-    $PY telegram-admin.py create-topic <chat_id> <topic name> --icon-color 0
+    VENV=$(grep -aoE '/[^ "]*/venv/bin/' "$(command -v hermes)" 2>/dev/null | head -1)
+    PY="${VENV}python"
+    [ -x "$PY" ] || PY=$(dirname $(dirname $(readlink -f $(command -v hermes))))/venv/bin/python
+    $PY telegram-admin.py create-topic --icon-color 0 <chat_id> <topic name>
 
-Commands:
-  create-topic <chat_id> <name>   create a forum topic; prints the thread_id
+Commands (FLAGS FIRST - the parser consumes leading --flags before
+positional args; putting flags after the name fails with the usage line):
+  create-topic [--icon-color <0-6>] [--icon-emoji-id <custom_id>] <chat_id> <name>
+    create a forum topic; prints the thread_id.
     --icon-color <0-6>            native Telegram topic icon color (no emoji
                                   needed in the name - keeps titles short)
-    --icon-emoji-id <custom_id>   optional custom emoji icon id
+    --icon-emoji-id <custom_id>   official Telegram topic icon (from
+                                  getForumTopicIconStickers, 112 available)
 
 The bot token is read from ~/.hermes/.env (TELEGRAM_BOT_TOKEN) or the env.
 """
@@ -72,8 +77,8 @@ async def main() -> None:
                 sys.exit(f"unknown option: {flag}")
         if len(args) != 2:
             sys.exit(
-                "usage: telegram-admin.py create-topic <chat_id> <name> "
-                "[--icon-color 0-6] [--icon-emoji-id <id>]"
+                "usage: telegram-admin.py create-topic [--icon-color 0-6] "
+                "[--icon-emoji-id <id>] <chat_id> <name>"
             )
         await create_topic(args[0], args[1], icon_color, icon_emoji_id)
     else:

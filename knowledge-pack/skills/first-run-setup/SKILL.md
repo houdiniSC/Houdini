@@ -161,8 +161,9 @@ a negative chat_id (group) → `home_channel`, a positive one (DM) → `home_use
    - `التقارير` (final reports) — icon_color 3
    - `المهام المجدولة` (scheduled task results) — icon_color 5
    - `الإعدادات` (AI settings discussion) — icon_color 1
-   Create with the toolkit helper (passes icon_color to createForumTopic):
-   `PY=$(dirname $(dirname $(readlink -f $(command -v hermes))))/venv/bin/python; $PY ~/.hermes/toolkit/tools/telegram-admin.py create-topic <chat_id> "الأهداف" --icon-color 0`
+   Create with the toolkit helper (FLAGS FIRST — the parser consumes
+   leading --flags before positional args; flags after the name fail):
+   `VENV=$(grep -aoE '/[^ "]*/venv/bin/' "$(command -v hermes)" 2>/dev/null | head -1); PY="${VENV}python"; [ -x "$PY" ] || PY=$(dirname $(dirname $(readlink -f $(command -v hermes))))/venv/bin/python; $PY ~/.hermes/toolkit/tools/telegram-admin.py create-topic --icon-color 0 <chat_id> "الأهداف"`
    The general chat is Telegram's built-in General topic (thread id `1`) —
    NEVER create a separate `عام` topic. Map `general → 1` directly.
    Save each returned thread_id under `home_channel.topics` only, then set

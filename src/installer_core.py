@@ -729,18 +729,14 @@ class LiveInstaller:
                     # issue #85272). Downgrade to the last known-good 22.6 so
                     # the bot actually answers. Remove once upstream fixes it.
                     self.on_log("pinning python-telegram-bot 22.6 (issue #85272 workaround)")
-                    _uv = (
-                        "command -v uv >/dev/null 2>&1 && uv"
-                        " || { [ -x ~/.hermes/bin/uv ] && echo ~/.hermes/bin/uv; }"
-                        " || { [ -x /usr/local/share/uv/bin/uv ] && echo /usr/local/share/uv/bin/uv; }"
-                        " || { [ -x /usr/local/share/uv/uv ] && echo /usr/local/share/uv/uv; }"
-                        " || { [ -x ~/.local/bin/uv ] && echo ~/.local/bin/uv; }"
-                        " || true"
-                    )
+                    # ensurepip is bundled with Python itself (3.12) — it
+                    # rebuilds pip inside the Hermes venv WITHOUT depending on
+                    # uv's install path, which keeps moving between releases
+                    # (~/.hermes/bin/uv, /usr/local/share/uv/bin/uv, ...).
                     await self._sh(
-                        f"UV=$({_uv}); [ -n \"$UV\" ] && \"$UV\" pip install -q "
-                        f"--python /usr/local/lib/hermes-agent/venv/bin/python "
-                        f"\"python-telegram-bot[webhooks]==22.6\" || true"
+                        "/usr/local/lib/hermes-agent/venv/bin/python -m ensurepip --upgrade >/dev/null 2>&1 "
+                        "&& /usr/local/lib/hermes-agent/venv/bin/python -m pip install -q "
+                        "\"python-telegram-bot[webhooks]==22.6\" || true"
                     )
                     return True
                 if tool_path("hermes"):
