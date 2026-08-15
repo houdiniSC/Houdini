@@ -271,13 +271,13 @@ class WizardScreen(Screen):
                         )
                         with Horizontal(id="decide_row"):
                             yield Button(
-                                "Continue & customize",
-                                id="decide_custom",
+                                "Quick install (all tools)",
+                                id="decide_quick",
                                 variant="primary",
                             )
                             yield Button(
-                                "Quick install (defaults)",
-                                id="decide_quick",
+                                "Customize tools",
+                                id="decide_custom",
                                 variant="default",
                             )
                     with Vertical(id="step-tools", classes="step"):

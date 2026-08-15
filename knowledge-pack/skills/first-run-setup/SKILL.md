@@ -185,7 +185,23 @@ a negative chat_id (group) → `home_channel`, a positive one (DM) → `home_use
    Check `~/.hermes/toolkit/assets/manifest.json` too and restore missing
    files from `~/.hermes/toolkit/backups/` per `asset-ingestion` self-heal.
    Assets are discovered dynamically — never copy their paths into memory.
-8. **Announce readiness**:
+8. **Asset & readiness report** — send one compact message telling the
+   user the live status of their tools and keys, then URGE them to fill
+   the gaps. Read only (inventory.yaml + `ls` of the key registry) — do
+   not fabricate and do not write anything to memory. Structure it like:
+
+   > 🧰 **حالة الأدوات والمفاتيح**
+   > - الأدوات: <عدد> جاهزة (<أمثلة: nuclei, wpscan, drupwn…>) ✅
+   > - المفاتيح: <عدد موجود> — الناقص: <أمثلة: API، WPScan token، ngrok…>
+   > - VPN: <عدد> بروفايل جاهز / غير مهيّأ بعد
+   >
+   > مفاتيحك هي وقود عملي: بدونها لن أستطيع الفحص المتقدم، الـ WPScan،
+   > والأنفاق. أضفها متى شئت من ⚙️ الإعدادات أو 📦 أصول (اكتب
+   > «أضف مفتاح <اسم الخدمة>») وسأجهّزها فورًا.
+
+   Keep every number real (count what actually exists) and keep the
+   message short — a status line, not a report.
+9. **Announce readiness**:
    - Group: "ضع أهدافك في 🎯 الأهداف — أنشئ topic لكل هدف وابدأ بـ 'ابدأ الفحص'.
      التقارير في 📋 التقارير، النتائج المجدولة في ⏰ المهام، وإعداداتي في ⚙️ الإعدادات."
    - DM: "مساحة خاصة جاهزة — استخدم الصيغ الثابتة: 🎯 هدف:، 🚀 ابدأ فحص:،
