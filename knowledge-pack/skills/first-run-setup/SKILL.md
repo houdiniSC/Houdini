@@ -155,18 +155,26 @@ a negative chat_id (group) → `home_channel`, a positive one (DM) → `home_use
      group وإضافتي فيه — سأجهّز توبيكات منظمة هناك تلقائيًا."
    If declined, record the chat in its slot as flat (`topics: {}`) and stop.
 4. **Create topics** (only for group/forum, idempotent — reuse existing ones
-   by name if possible):
-   - `🎯 الأهداف` (target intake)
-   - `📋 التقارير` (final reports)
-   - `⏰ المهام المجدولة` (scheduled task results)
-   - `⚙️ الإعدادات` (AI settings discussion)
+   by name if possible). Topic names are PLAIN (no emoji in the name — the
+   emoji lives in the native Telegram topic icon so titles stay short):
+   - `الأهداف` (target intake) — icon_color 0
+   - `التقارير` (final reports) — icon_color 3
+   - `المهام المجدولة` (scheduled task results) — icon_color 5
+   - `الإعدادات` (AI settings discussion) — icon_color 1
+   Create with the toolkit helper (passes icon_color to createForumTopic):
+   `~/.hermes/hermes-agent/venv/bin/python ~/.hermes/toolkit/tools/telegram-admin.py create-topic <chat_id> "الأهداف" --icon-color 0`
    The general chat is Telegram's built-in General topic (thread id `1`) —
    NEVER create a separate `عام` topic. Map `general → 1` directly.
-   Use the platform API (e.g. `createForumTopic`). Save each returned
-   thread_id under `home_channel.topics` only, then set
+   Save each returned thread_id under `home_channel.topics` only, then set
    `topics_pending: false` (DM slots become flat immediately and clear the
    flag too).
-5. **Persist**: write `workspace_topics.json` and update
+5. **Rename sessions immediately after topics exist** — for EVERY topic
+   (do not skip any): find the session id with `hermes sessions list`
+   (match the key ending `:<thread_id>`) and rename it to the PLAIN topic
+   name (no emoji): `الأهداف`, `التقارير`, `المهام المجدولة`, `الإعدادات`,
+   and `عام` for thread_id 1. Do the same for the DM session when the
+   first message lands. Never leave an auto-generated title behind.
+6. **Persist**: write `workspace_topics.json` and update
    `channel_directory.json`. These two files are the authoritative routing
    state — every message-classification rule in SOUL.md reads them.
    **NEVER try to write `config.yaml`**: Hermes blocks agent edits to it
@@ -174,7 +182,7 @@ a negative chat_id (group) → `home_channel`, a positive one (DM) → `home_use
    verifier warning). If the operator wants `platforms.telegram.home_channel`
    bound in `config.yaml`, they set it at install time or with
    `hermes config` themselves — the agent must not touch it.
-6. **Ensure the work root** exists: `mkdir -p ~/recon` (per-target folders
+7. **Ensure the work root** exists: `mkdir -p ~/recon` (per-target folders
    are created when a target is accepted — SCOPE.md, evidence/, poc/,
    reports/, logs/ — see SOUL.md "هيكل العمل").
 7. **Verify environment assets** (read-only — do NOT write memory): confirm

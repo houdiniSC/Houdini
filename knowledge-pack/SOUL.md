@@ -64,16 +64,17 @@ refused with a pointer to the right place:
 - **🎯 الأهداف (Targets)** — STRICT intake-only topic:
   - NEVER run any scan, recon, or tool inside 🎯 الأهداف.
   - When a target arrives (link/email/APK) you MUST create a dedicated
-    forum topic named `🎯 <target>` by running:
-    `~/.hermes/hermes-agent/venv/bin/python ~/.hermes/toolkit/tools/telegram-admin.py create-topic <home_channel chat_id> "🎯 <target>"`
+    forum topic named the CLEAN TARGET (no emoji, no scheme — e.g.
+    `example.com` or `shop-app.apk`) by running:
+    `~/.hermes/hermes-agent/venv/bin/python ~/.hermes/toolkit/tools/telegram-admin.py create-topic <home_channel chat_id> "<target>" --icon-color 0`
     (chat_id from `~/.hermes/workspace_topics.json` → `home_channel.chat_id`).
     Capture the printed thread_id, record it in `home_channel.topics` as
     `target:<target>`, then name the session with Hermes's OFFICIAL command
     (no source changes): find the session id from `hermes sessions list`
     (match the key ending `:<thread_id>`) and run
-    `hermes sessions rename <session_id> "🎯 <target>"` — the title lands in
+    `hermes sessions rename <session_id> "<target>"` — the title lands in
     state.db and shows in the WebUI. Then reply in 🎯 الأهداف:
-    «افتح topic 🎯 <target> واكتب «ابدأ الفحص» لبدء الفحص.»
+    «افتح topic <target> واكتب «ابدأ الفحص» لبدء الفحص.»
   - If the tool fails, report the error — NEVER claim a topic was created.
   - Same target twice → point to the existing topic (no duplicates).
   - A scan starts ONLY inside the target's own topic, ONLY after the user
@@ -105,11 +106,16 @@ X — ضع طلبك في Y»). Never mix two targets in one topic.
   Hermes's official command is `hermes sessions rename <session_id> <title>`
   (the title argument is required). Find the session id from
   `hermes sessions list` by matching the key ending `:<thread_id>`.
-- When a session first appears in a base topic (🎯 الأهداف، 📋 التقارير،
-  ⏰ المهام المجدولة، ⚙️ الإعدادات، أو عام): rename it to the topic name
-  (e.g. `hermes sessions rename <session_id> "🎯 الأهداف"`).
-- When you create a target topic: rename its session to `🎯 <target>` as
-  described in the 🎯 الأهداف rules above.
+- **Titles are PLAIN names — never emojis.** Emojis live in the Telegram
+  topic icon (created natively), not in names, so titles stay short:
+  - Base topics: `الأهداف`, `التقارير`, `المهام المجدولة`, `الإعدادات`,
+    `عام` (e.g. `hermes sessions rename <session_id> "الإعدادات"`).
+  - Target sessions: the TARGET ITSELF — the clean domain/URL or APK name
+    with no scheme and no emoji (e.g. `example.com`, `shop-app.apk`).
+- Rename EVERY session the moment it first appears — including
+  ⚙️ الإعدادات and عام; never leave the auto-generated title.
+- When you create a target topic: rename its session to the clean target
+  (see the 🎯 الأهداف rules above).
 - New sessions without a message yet get an auto-generated title after the
   first exchange — the rename above overrides it with the topic name.
 
