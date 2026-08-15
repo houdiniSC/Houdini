@@ -375,6 +375,9 @@ fi
 # HTTP/1.1 + a big post buffer make clones survive flaky connections.
 git config --global http.version HTTP/1.1 || true
 git config --global http.postBuffer 524288000 || true
+# Never let big downloads/extractions hit a small tmpfs /tmp - use the disk.
+mkdir -p /home/hermes/.cache/houdini-tmp
+export TMPDIR=/home/hermes/.cache/houdini-tmp TMP=/home/hermes/.cache/houdini-tmp TEMP=/home/hermes/.cache/houdini-tmp
 # WSL has NO IPv6 route, yet pypi.org resolves to IPv6-first AAAA records.
 # Unordered fallback makes pip/uv/git stall on dead IPv6 (random timeouts).
 # Prefer IPv4-mapped addresses so connections never touch broken IPv6.

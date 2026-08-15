@@ -89,6 +89,11 @@ done
 
 # root (e.g. bare SSH server) may not have sudo installed - empty prefix
 if [ "$(id -u)" = 0 ]; then SUDO=""; else SUDO="sudo"; fi
+# Cloud images mount /tmp as a tiny tmpfs (Hetzner: 1.9G). Big downloads
+# and extractions (playwright ~800MB) fill it mid-run and freeze on write.
+# Point ALL temp work at the real disk up front - children inherit it.
+if [ ! -d "$HOME/.cache/houdini-tmp" ]; then mkdir -p "$HOME/.cache/houdini-tmp" 2>/dev/null; fi
+export TMPDIR="$HOME/.cache/houdini-tmp" TMP="$HOME/.cache/houdini-tmp" TEMP="$HOME/.cache/houdini-tmp"
 # Weak links drop git fetches mid-clone ("curl 56 Connection died").
 # HTTP/1.1 + a big post buffer make clones survive flaky connections.
 git config --global http.version HTTP/1.1 2>/dev/null || true

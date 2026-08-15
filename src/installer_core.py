@@ -512,6 +512,21 @@ class LiveInstaller:
         self.dry_run = dry_run
         self.sudo_password = sudo_password
         self.failed: list[str] = []
+        # Hetzner-style cloud images mount /tmp as a tiny tmpfs (often
+        # 1-2 GB). Browser downloads (playwright ~800MB unpacked) and other
+        # big extractions then fill it mid-run and freeze on write(2).
+        # Point ALL temp work at the real disk once, up front; every
+        # subprocess (pip, unzip, playwright, node) inherits this env.
+        self._tmpdir = Path.home() / ".cache" / "houdini-tmp"
+        try:
+            self._tmpdir.mkdir(parents=True, exist_ok=True)
+            for _var in ("TMPDIR", "TMP", "TEMP"):
+                os.environ[_var] = str(self._tmpdir)
+            os.environ["PLAYWRIGHT_BROWSERS_PATH"] = str(
+                Path.home() / ".cache" / "ms-playwright"
+            )
+        except OSError:
+            pass  # fall back to system tmp if ~/.cache is unavailable
         base_log = on_log or (lambda _line: None)
         self.log_file = Path(log_file).expanduser() if log_file else None
         if self.log_file is not None:
