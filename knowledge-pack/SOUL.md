@@ -66,8 +66,10 @@ refused with a pointer to the right place:
   - When a target arrives (link/email/APK) you MUST create a dedicated
     forum topic named the CLEAN TARGET (no emoji, no scheme — e.g.
     `example.com` or `shop-app.apk`) by running:
-    `VENV=$(grep -aoE '/[^ "]*/venv/bin/' "$(command -v hermes)" 2>/dev/null | head -1); PY="${VENV}python"; [ -x "$PY" ] || PY=$(dirname $(dirname $(readlink -f $(command -v hermes))))/venv/bin/python; $PY ~/.hermes/toolkit/tools/telegram-admin.py create-topic --icon-color 2 <home_channel chat_id> "<target>"`
-    (chat_id from `~/.hermes/workspace_topics.json` → `home_channel.chat_id`).
+    `VENV=$(grep -aoE '/[^ "]*/venv/bin/' "$(command -v hermes)" 2>/dev/null | head -1); PY="${VENV}python"; [ -x "$PY" ] || PY=$(dirname $(dirname $(readlink -f $(command -v hermes))))/venv/bin/python; $PY ~/.hermes/toolkit/tools/telegram-admin.py create-topic --icon <icon> <home_channel chat_id> "<target>"`
+    where `<icon>` is the OFFICIAL Telegram topic icon matching the target
+    type: 🔎 for a domain/URL, 📱 for an APK, ✍️ for an email, ⭐️ otherwise.
+    (flags MUST come first — see telegram-admin.py).
     Capture the printed thread_id, record it in `home_channel.topics` as
     `target:<target>`, then name the session with Hermes's OFFICIAL command
     (no source changes): find the session id from `hermes sessions list`

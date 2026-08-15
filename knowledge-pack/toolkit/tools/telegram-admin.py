@@ -10,12 +10,15 @@ Run with the Hermes venv python (it has the telegram library):
 
 Commands (FLAGS FIRST - the parser consumes leading --flags before
 positional args; putting flags after the name fails with the usage line):
-  create-topic [--icon-color <0-6>] [--icon-emoji-id <custom_id>] <chat_id> <name>
+  create-topic [--icon-color <0-6>] [--icon-emoji-id <custom_id>]
+               [--icon <emoji>] <chat_id> <name>
     create a forum topic; prints the thread_id.
     --icon-color <0-6>            native Telegram topic icon color (no emoji
                                   needed in the name - keeps titles short)
-    --icon-emoji-id <custom_id>   official Telegram topic icon (from
-                                  getForumTopicIconStickers, 112 available)
+    --icon <emoji>                pick the official Telegram topic icon whose
+                                  emoji matches (112 official icons, resolved
+                                  automatically via getForumTopicIconStickers)
+    --icon-emoji-id <custom_id>   explicit custom emoji id
 
 The bot token is read from ~/.hermes/.env (TELEGRAM_BOT_TOKEN) or the env.
 """
@@ -58,6 +61,20 @@ async def create_topic(
     print(res.message_thread_id)
 
 
+async def resolve_icon_id(bot: "telegram.Bot", icon_emoji: str) -> str | None:
+    """Map a plain emoji (e.g. 🎯) to one of the 112 OFFICIAL Telegram
+    topic icons via getForumTopicIconStickers. Returns the custom_emoji_id
+    or None when no official icon matches that emoji."""
+    try:
+        stickers = await bot.get_forum_topic_icon_stickers()
+    except Exception:
+        return None
+    for s in stickers:
+        if getattr(s, "emoji", "") == icon_emoji:
+            return s.custom_emoji_id
+    return None
+
+
 async def main() -> None:
     if len(sys.argv) < 2:
         print(__doc__)
@@ -67,19 +84,32 @@ async def main() -> None:
         args = sys.argv[2:]
         icon_color = None
         icon_emoji_id = None
+        icon_emoji = None
         while args and args[0].startswith("--"):
             flag = args.pop(0)
             if flag == "--icon-color" and args:
                 icon_color = int(args.pop(0))
             elif flag == "--icon-emoji-id" and args:
                 icon_emoji_id = args.pop(0)
+            elif flag == "--icon" and args:
+                icon_emoji = args.pop(0)
             else:
                 sys.exit(f"unknown option: {flag}")
         if len(args) != 2:
             sys.exit(
                 "usage: telegram-admin.py create-topic [--icon-color 0-6] "
-                "[--icon-emoji-id <id>] <chat_id> <name>"
+                "[--icon-emoji-id <id>] [--icon <emoji>] <chat_id> <name>"
             )
+        if icon_emoji and not icon_emoji_id:
+            from telegram import Bot
+
+            bot = Bot(token=get_token())
+            icon_emoji_id = await resolve_icon_id(bot, icon_emoji)
+            if not icon_emoji_id:
+                sys.exit(
+                    f"no official topic icon matches emoji {icon_emoji} "
+                    f"(run getForumTopicIconStickers to list the 112)"
+                )
         await create_topic(args[0], args[1], icon_color, icon_emoji_id)
     else:
         sys.exit(f"unknown command: {cmd}")
