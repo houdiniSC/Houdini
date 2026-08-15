@@ -702,16 +702,9 @@ class LiveInstaller:
                     "| timeout 1200 bash -s -- --non-interactive --skip-setup --skip-browser"
                 )
                 if ok:
-                    # install.sh already started the gateway service. Stop
-                    # it NOW: ~/.hermes files (state.db included) are still
-                    # being replaced by later steps, and a process started
-                    # here would hold fds to deleted inodes (readonly-db
-                    # writes later). The dedicated final "gateway" step
-                    # restarts it cleanly when everything is in place.
-                    if tool_path("hermes"):
-                        await self._sh(
-                            "hermes gateway stop < /dev/null >/dev/null 2>&1; true"
-                        )
+                    # NOTE: install.sh starts the gateway service here, but
+                    # the dedicated final "gateway" step (last in the list)
+                    # restarts it cleanly on the final files - no stop needed.
                     return True
                 if tool_path("hermes"):
                     self.on_log("Hermes install retry succeeded via leftover artifacts")
