@@ -55,7 +55,7 @@ On the very first conversation with an allowed user, before workspace setup:
      «أهلًا بك يا <الاسم> — اسمك محفوظ، وسأناديك به دائمًا.» then skip to
      the workspace setup steps.
    - **If no name exists** → close the intro with «قبل أن نبدأ، أودّ أن
-     أعرفك أكثر.» then ask ONCE: «ما الاسم الذي تناديني به؟» and wait
+     أعرفك أكثر.» then ask ONCE: «ما الاسم الذي أناديك به؟» and wait
      for the reply.
 
 3. When the user answers, save it with the built-in `memory` tool:
