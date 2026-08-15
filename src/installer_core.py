@@ -682,20 +682,19 @@ class LiveInstaller:
             # Flaky networks drop PyPI/GitHub connections mid-fetch; retry
             # the whole installer a few times before declaring failure.
             #
-            # PLAYWRIGHT_SKIP_BROWSER_DOWNLOAD=1: Hermes' install.sh pulls
-            # playwright via npm whose postinstall downloads the browser.
-            # On cloud images that step froze mid-extract (Node 26 bug with
-            # big zip extractions) - our own "browser" step installs the
-            # browser reliably via pip/venv, so skip the npm copy.
-            # timeout 1200: hard cap - a frozen child (extract hang) must
-            # never stall the whole wizard; the retry loop below re-runs.
+            # --skip-browser: Hermes' install.sh would pull Playwright via npm
+            # (Node) whose extract froze on cloud images (Node 26 bug). Our
+            # own "browser" step installs the SAME Playwright version through
+            # pip/Python - stable zipfile extraction - so the browser engine
+            # is always installed by Python, never Node.
+            # timeout 1200: hard cap - a frozen child must never stall the
+            # wizard; the retry loop below re-runs.
             _py_ver = f"{sys.version_info.major}.{sys.version_info.minor}"
             for attempt in (1, 2, 3):
                 ok = await self._sh(
                     "curl -fsSL https://hermes-agent.nousresearch.com/install.sh "
                     f"| sed 's/^PYTHON_VERSION=\\\"3.11\\\"/PYTHON_VERSION=\\\"{_py_ver}\\\"/' "
-                    "| timeout 1200 bash -s -- --non-interactive --skip-setup",
-                    env={"PLAYWRIGHT_SKIP_BROWSER_DOWNLOAD": "1"},
+                    "| timeout 1200 bash -s -- --non-interactive --skip-setup --skip-browser"
                 )
                 if ok:
                     return True
@@ -837,13 +836,19 @@ class LiveInstaller:
                 return True
             venv = Path.home() / "browser-venv"
             py = venv / "bin" / "python"
-            # Match the Playwright version Hermes already installed so its
-            # browser cache (~/.cache/ms-playwright) is reused - no second
-            # Chrome download. Browsers are installed as the agent user (not
-            # via sudo) so the cache lands in the right $HOME.
+            # Match the Playwright version Hermes' browser tools expect so
+            # pip downloads the SAME chromium revision into the shared cache
+            # (~/.cache/ms-playwright) - one browser, used by both. Hermes
+            # installs FHS-style under /usr/local/lib/hermes-agent; check
+            # that first, then the legacy ~/.hermes path, then the npm
+            # package.json as the final source of truth.
             pw_ver = ""
-            hermes_py = HERMES_HOME / "hermes-agent" / "venv" / "bin" / "python"
-            if hermes_py.is_file():
+            _candidates = [
+                Path("/usr/local/lib/hermes-agent/venv/bin/python"),
+                HERMES_HOME / "hermes-agent" / "venv" / "bin" / "python",
+            ]
+            hermes_py = next((p for p in _candidates if p.is_file()), None)
+            if hermes_py is not None:
                 raw = (
                     await self._sh_out(
                         f"{shlex.quote(str(hermes_py))} -c "
@@ -857,10 +862,21 @@ class LiveInstaller:
                 # traceback line when playwright isn't in the Hermes venv.
                 if re.fullmatch(r"[0-9]+(?:\.[0-9]+)+", raw):
                     pw_ver = raw
-                else:
-                    self.on_log(
-                        "playwright not in Hermes venv — installing latest"
-                    )
+            if not pw_ver:
+                npm_pkg = Path(
+                    "/usr/local/lib/hermes-agent/node_modules/playwright/package.json"
+                )
+                if npm_pkg.is_file():
+                    try:
+                        import json as _json
+                        _ver = _json.loads(npm_pkg.read_text(encoding="utf-8")).get("version")
+                        if _ver and re.fullmatch(r"[0-9]+(?:\.[0-9]+)+", str(_ver)):
+                            pw_ver = str(_ver)
+                            self.on_log(f"matching playwright {pw_ver} from Hermes npm package")
+                    except Exception:
+                        pass
+            if not pw_ver:
+                self.on_log("playwright not found in Hermes — installing latest")
             pw_spec = f"playwright=={pw_ver}" if pw_ver else "playwright"
             # Minimal cloud images: venv creation "succeeds" but yields no
             # pip (ensurepip missing) AND apt lists are empty until the first
