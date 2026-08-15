@@ -721,6 +721,25 @@ class LiveInstaller:
                     # NOTE: install.sh starts the gateway service here, but
                     # the dedicated final "gateway" step (last in the list)
                     # restarts it cleanly on the final files - no stop needed.
+                    #
+                    # Hermes v0.20.x pins python-telegram-bot[webhooks] 22.8,
+                    # which breaks the Telegram adapter ("Any cannot be
+                    # instantiated" - TypeHandler is left bound to typing.Any
+                    # after the lazy import; see NousResearch/hermes-agent
+                    # issue #85272). Downgrade to the last known-good 22.6 so
+                    # the bot actually answers. Remove once upstream fixes it.
+                    self.on_log("pinning python-telegram-bot 22.6 (issue #85272 workaround)")
+                    _uv = (
+                        "command -v uv >/dev/null 2>&1 && uv"
+                        " || { [ -x /usr/local/share/uv/bin/uv ] && echo /usr/local/share/uv/bin/uv; }"
+                        " || { [ -x /usr/local/share/uv/uv ] && echo /usr/local/share/uv/uv; }"
+                        " || true"
+                    )
+                    await self._sh(
+                        f"UV=$({_uv}); [ -n \"$UV\" ] && \"$UV\" pip install -q "
+                        f"--python /usr/local/lib/hermes-agent/venv/bin/python "
+                        f"\"python-telegram-bot[webhooks]==22.6\" || true"
+                    )
                     return True
                 if tool_path("hermes"):
                     self.on_log("Hermes install retry succeeded via leftover artifacts")
