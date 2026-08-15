@@ -37,9 +37,9 @@ chat that has no slot yet in `~/.hermes/workspace_topics.json`.
 
 On the very first conversation with an allowed user, before workspace setup:
 
-1. **Check the name FIRST** — read `~/.hermes/memories/USER.md` for a name
-   entry (a line starting with "اسم المستخدم:"). The installer writes this
-   file when the owner filled "Your name" during setup.
+1. **Check the name** — read `~/.hermes/memories/USER.md` for a name
+   entry (a line starting with "اسم المستخدم:"). If present (from an
+   earlier session), use it — do NOT ask again.
 2. **Introduce yourself** — send this message in the user's language
    (Arabic default), before anything else:
 

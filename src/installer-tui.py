@@ -258,10 +258,6 @@ class WizardScreen(Screen):
                             placeholder="Allowed Telegram user IDs (comma-separated, e.g. 123456789,987654321)",
                             id="users",
                         )
-                        yield Input(
-                            placeholder="Your name - the agent calls you by it (e.g. Houdini)",
-                            id="owner_name",
-                        )
                         yield Static(
                             f"[{SLATE_DIM}]Find your user ID: message @userinfobot on Telegram.[/]",
                             id="telegram_hint",
@@ -793,7 +789,6 @@ class WizardScreen(Screen):
         secrets = self.app.data["secrets"]
         secrets["bot"] = self.query_one("#bot", Input).value.strip()
         secrets["users"] = self.query_one("#users", Input).value.strip()
-        self.app.data["owner_name"] = self.query_one("#owner_name", Input).value.strip()
         self.app.data["secrets_count"] = self._count_secrets()
 
     def _collect_secrets(self) -> None:
@@ -941,7 +936,6 @@ class WizardScreen(Screen):
         table.add_row("API key", mask(api_key) if api_key else "not set")
         table.add_row("Bot token", mask(bot) if bot else "not set")
         table.add_row("Allowed users", users if users else "not set (open)")
-        table.add_row("Your name", data.get("owner_name") or "not set (agent will ask)")
         table.add_row("Sudo mode", mode_label)
         table.add_row("Personality", "set at first conversation (agent name + style)")
         webui = data.get("webui", True)
@@ -1151,7 +1145,6 @@ class HoudiniInstaller(App):
             "tools": {},
             "secrets": {},
             "secrets_count": 0,
-            "owner_name": "",
             "sudo_mode": "restricted",
             "webui": True,
             "webui_host": "127.0.0.1",
