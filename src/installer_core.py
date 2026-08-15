@@ -696,7 +696,13 @@ class LiveInstaller:
             # and starts the service instead (the "yes" answer, effectively).
             # timeout 1200: hard cap - a frozen child must never stall the
             # wizard; the retry loop below re-runs.
-            _py_ver = f"{sys.version_info.major}.{sys.version_info.minor}"
+            # Hermes Agent is built and tested against Python 3.12. Newer
+            # interpreters (3.14 on Ubuntu 26.04) break its internals:
+            # DaemonThreadPoolExecutor._initializer missing, typing "Any
+            # cannot be instantiated" in the telegram adapter, playwright
+            # rejects the OS entirely. ALWAYS pin 3.12 - uv provisions it
+            # from python-build-standalone when apt has none.
+            _py_ver = "3.12"
             for attempt in (1, 2, 3):
                 if attempt == 1:
                     # A previous failed attempt can leave a half-created

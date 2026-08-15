@@ -211,14 +211,14 @@ if command -v hermes >/dev/null 2>&1; then
   ui_info "Hermes" "✓ Hermes found: $(hermes --version 2>/dev/null | head -1)"
 else
   ui_info "Hermes" "Installing Hermes Agent..."
-  # install.sh hardcodes PYTHON_VERSION="3.11". Do not pin any version:
-  # use whatever Python this system already has (Ubuntu 24.04 -> 3.12,
-  # 25.04 -> 3.14, ...). uv python find <that> resolves locally - no
-  # python-build-standalone tarball download from GitHub.
-  PY_VER="$(python3 -c 'import sys; print(f"{sys.version_info.major}.{sys.version_info.minor}")' 2>/dev/null || echo 3.12)"
+  # Hermes Agent is built against Python 3.12 - always pin it (see
+  # installer_core.py: newer interpreters break its internals). setsid:
+  # install.sh probes /dev/tty before its gateway questions - under a
+  # background TUI that probe freezes on SIGTTIN; detached, it fails fast.
+  PY_VER="3.12"
   curl -fsSL https://hermes-agent.nousresearch.com/install.sh \
     | sed "s/^PYTHON_VERSION=\"3.11\"/PYTHON_VERSION=\"$PY_VER\"/" \
-    | bash -s -- --non-interactive --skip-setup >> "$LOG" 2>&1 \
+    | timeout 1200 setsid bash -s -- --non-interactive --skip-setup --skip-browser >> "$LOG" 2>&1 \
     || { ui_box "Error" 8 60 "✗ Hermes install failed — see $LOG"; exit 1; }
 fi
 
