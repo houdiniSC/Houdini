@@ -681,12 +681,21 @@ class LiveInstaller:
             #
             # Flaky networks drop PyPI/GitHub connections mid-fetch; retry
             # the whole installer a few times before declaring failure.
+            #
+            # PLAYWRIGHT_SKIP_BROWSER_DOWNLOAD=1: Hermes' install.sh pulls
+            # playwright via npm whose postinstall downloads the browser.
+            # On cloud images that step froze mid-extract (Node 26 bug with
+            # big zip extractions) - our own "browser" step installs the
+            # browser reliably via pip/venv, so skip the npm copy.
+            # timeout 1200: hard cap - a frozen child (extract hang) must
+            # never stall the whole wizard; the retry loop below re-runs.
             _py_ver = f"{sys.version_info.major}.{sys.version_info.minor}"
             for attempt in (1, 2, 3):
                 ok = await self._sh(
                     "curl -fsSL https://hermes-agent.nousresearch.com/install.sh "
-                    f"| sed 's/^PYTHON_VERSION=\"3.11\"/PYTHON_VERSION=\"{_py_ver}\"/' "
-                    "| bash -s -- --non-interactive --skip-setup"
+                    f"| sed 's/^PYTHON_VERSION=\\\"3.11\\\"/PYTHON_VERSION=\\\"{_py_ver}\\\"/' "
+                    "| timeout 1200 bash -s -- --non-interactive --skip-setup",
+                    env={"PLAYWRIGHT_SKIP_BROWSER_DOWNLOAD": "1"},
                 )
                 if ok:
                     return True
