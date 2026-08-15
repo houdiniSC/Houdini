@@ -3,8 +3,8 @@
 telegram-admin.py - admin helpers for the Houdini Telegram gateway.
 
 Run with the Hermes venv python (it has the telegram library):
-    ~/.hermes/hermes-agent/venv/bin/python telegram-admin.py \
-        create-topic <chat_id> <topic name> --icon-color 0
+    PY=$(dirname $(dirname $(readlink -f $(command -v hermes))))/venv/bin/python
+    $PY telegram-admin.py create-topic <chat_id> <topic name> --icon-color 0
 
 Commands:
   create-topic <chat_id> <name>   create a forum topic; prints the thread_id

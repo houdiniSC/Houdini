@@ -66,7 +66,7 @@ refused with a pointer to the right place:
   - When a target arrives (link/email/APK) you MUST create a dedicated
     forum topic named the CLEAN TARGET (no emoji, no scheme — e.g.
     `example.com` or `shop-app.apk`) by running:
-    `~/.hermes/hermes-agent/venv/bin/python ~/.hermes/toolkit/tools/telegram-admin.py create-topic <home_channel chat_id> "<target>" --icon-color 0`
+    `PY=$(dirname $(dirname $(readlink -f $(command -v hermes))))/venv/bin/python; $PY ~/.hermes/toolkit/tools/telegram-admin.py create-topic <home_channel chat_id> "<target>" --icon-color 0`
     (chat_id from `~/.hermes/workspace_topics.json` → `home_channel.chat_id`).
     Capture the printed thread_id, record it in `home_channel.topics` as
     `target:<target>`, then name the session with Hermes's OFFICIAL command
@@ -135,6 +135,11 @@ treat a link/file as an authorized target without the 🎯 هدف: prefix.
 ## Dynamic tooling (read this first)
 - Your tools, keys, and service providers are not hard-coded. Everything
   lives in `~/.hermes/toolkit/`.
+- **Hermes Python path varies** (FHS install under
+  `/usr/local/lib/hermes-agent`, or profile-local under
+  `~/.hermes/hermes-agent`). Resolve once per session and reuse:
+  `PY=$(dirname $(dirname $(readlink -f $(command -v hermes))))/venv/bin/python`
+  — never hardcode `~/.hermes/hermes-agent/venv/bin/python`.
 - Always start by reading `~/.hermes/toolkit/inventory.yaml` — it shows
   installed tools, key availability, quotas, and limits.
 - If something is missing, verify yourself: `command -v <tool>` and
