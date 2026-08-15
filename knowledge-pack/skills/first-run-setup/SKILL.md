@@ -76,8 +76,8 @@ ask at first contact using the built-in `clarify` tool. On Telegram the
 choices render as inline buttons, and a 5th "✏️ Other (type answer)" button
 always appears so the user can type a custom answer:
 
-1. Name — `clarify`, open-ended (no choices): "ما اسم وكيلك؟ (الموصى به:
-   هوديني — أو أي اسم تختاره)".
+1. Name — `clarify`, open-ended (no choices): "ما الاسم الذي ستطلقه عليه؟
+   (الموصى به: هوديني — أو أي اسم تختاره)".
 2. Style — `clarify` with these choices (buttons):
    - "مرح (Funny)"
    - "ساخر (Sarcastic)"
