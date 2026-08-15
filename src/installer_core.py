@@ -942,6 +942,19 @@ class LiveInstaller:
                 self.on_log("config.yaml missing — memory step skipped")
                 return False
             text = cfg.read_text(encoding="utf-8")
+            # Owner name → ~/.hermes/memories/USER.md so the agent calls the
+            # user by name from the very first message (no first-chat ask).
+            owner = str(self.data.get("owner_name") or "").strip()
+            if owner:
+                memories = HERMES_HOME / "memories"
+                memories.mkdir(parents=True, exist_ok=True)
+                user_md = memories / "USER.md"
+                if not user_md.is_file():
+                    user_md.write_text(
+                        f"اسم المستخدم: {owner}\nلغة المحادثة: العربية\n",
+                        encoding="utf-8",
+                    )
+                    self.on_log(f"USER.md written — agent will call you {owner}")
             if enabled:
                 text = ensure_holographic_memory(text)
                 cfg.write_text(text, encoding="utf-8")
