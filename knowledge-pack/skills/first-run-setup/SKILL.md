@@ -166,9 +166,14 @@ a negative chat_id (group) → `home_channel`, a positive one (DM) → `home_use
    thread_id under `home_channel.topics` only, then set
    `topics_pending: false` (DM slots become flat immediately and clear the
    flag too).
-5. **Persist**: write `workspace_topics.json`; set `home_channel` in
-   `config.yaml` to the group (chat_id + thread_id) when a group exists,
-   otherwise to the DM chat. Update `channel_directory.json` as well.
+5. **Persist**: write `workspace_topics.json` and update
+   `channel_directory.json`. These two files are the authoritative routing
+   state — every message-classification rule in SOUL.md reads them.
+   **NEVER try to write `config.yaml`**: Hermes blocks agent edits to it
+   (security-sensitive file; a rejected patch surfaces as a File-mutation
+   verifier warning). If the operator wants `platforms.telegram.home_channel`
+   bound in `config.yaml`, they set it at install time or with
+   `hermes config` themselves — the agent must not touch it.
 6. **Ensure the work root** exists: `mkdir -p ~/recon` (per-target folders
    are created when a target is accepted — SCOPE.md, evidence/, poc/,
    reports/, logs/ — see SOUL.md "هيكل العمل").
