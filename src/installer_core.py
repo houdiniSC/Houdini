@@ -731,8 +731,10 @@ class LiveInstaller:
                     self.on_log("pinning python-telegram-bot 22.6 (issue #85272 workaround)")
                     _uv = (
                         "command -v uv >/dev/null 2>&1 && uv"
+                        " || { [ -x ~/.hermes/bin/uv ] && echo ~/.hermes/bin/uv; }"
                         " || { [ -x /usr/local/share/uv/bin/uv ] && echo /usr/local/share/uv/bin/uv; }"
                         " || { [ -x /usr/local/share/uv/uv ] && echo /usr/local/share/uv/uv; }"
+                        " || { [ -x ~/.local/bin/uv ] && echo ~/.local/bin/uv; }"
                         " || true"
                     )
                     await self._sh(
