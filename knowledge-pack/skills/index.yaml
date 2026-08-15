@@ -7,6 +7,12 @@ skills:
   asset-ingestion:
     description: "Dynamic asset intake in the Settings topic — install new tools, add API keys, receive files/assets. Everything registers into the single toolkit registry + inventory.yaml so future sessions see it. Self-heal from backups. Never writes memory."
     file: asset-ingestion/SKILL.md
+  attack-cloudflare:
+    description: "Origin-IP discovery behind Cloudflare — subdomain enumeration (own tools), certificate transparency, passive DNS, historical records, direct-IP probing"
+    file: attack-cloudflare/SKILL.md
+  attack-wordpress:
+    description: "WordPress recon — version & plugin fingerprinting from the site index itself (no wpscan API needed), known-vuln matching, XML-RPC/config checks"
+    file: attack-wordpress/SKILL.md
   browser-capture:
     description: "Capture authenticated browser traffic through a local proxy (Playwright + mitmproxy) and feed the results into the recon/testing workflow"
     file: browser-capture/SKILL.md
@@ -34,5 +40,5 @@ skills:
 categories:
   cyberstrike:
     description: "CyberStrike skills library"
-    count: 7561
+    count: 7559
     index: cyberstrike/index.yaml

@@ -1,4 +1,4 @@
-# cyberstrike — 7561 skills
+# cyberstrike — 7559 skills
 # Load a SKILL.md only when its description/tags match the task.
 attack-methodologies:
   description: "Imported skill library — browse its index on demand"
