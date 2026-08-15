@@ -701,7 +701,7 @@ class LiveInstaller:
                 ok = await self._sh(
                     "curl -fsSL https://hermes-agent.nousresearch.com/install.sh "
                     f"| sed 's/^PYTHON_VERSION=\\\"3.11\\\"/PYTHON_VERSION=\\\"{_py_ver}\\\"/' "
-                    "| timeout 1200 setsid bash -s -- --non-interactive --skip-setup --skip-browser < /dev/null"
+                    "| timeout 1200 setsid bash -s -- --non-interactive --skip-setup --skip-browser"
                 )
                 if ok:
                     # NOTE: install.sh starts the gateway service here, but
