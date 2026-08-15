@@ -1092,7 +1092,7 @@ class LiveInstaller:
                 return True
             home = Path.home()
             webui_dir = home / "hermes-webui"
-            host = str(self.data.get("webui_host", "127.0.0.1"))
+            host = str(self.data.get("webui_host", "0.0.0.0"))
             port = str(self.data.get("webui_port", "8787"))
             if (webui_dir / "ctl.sh").is_file():
                 self.on_log("hermes-webui already present — skipping clone")

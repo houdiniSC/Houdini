@@ -329,8 +329,8 @@ class WizardScreen(Screen):
                             id="webui_enable",
                         )
                         yield Input(
-                            placeholder="Host (default 127.0.0.1)",
-                            value="127.0.0.1",
+                            placeholder="Host (default 0.0.0.0 = all interfaces)",
+                            value="0.0.0.0",
                             id="webui_host",
                         )
                         yield Input(
@@ -339,7 +339,7 @@ class WizardScreen(Screen):
                             id="webui_port",
                         )
                         yield Static(
-                            f"[{SLATE_DIM}]Final link http://127.0.0.1:8787 appears in the summary.[/]",
+                            f"[{SLATE_DIM}]Final link http://0.0.0.0:8787 appears in the summary (reachable from outside).[/]",
                             id="webui_note",
                         )
                     with Vertical(id="step-memory", classes="step"):
@@ -804,7 +804,7 @@ class WizardScreen(Screen):
 
     def _collect_webui(self) -> None:
         self.app.data["webui"] = self.query_one("#webui_enable", Checkbox).value
-        host = self.query_one("#webui_host", Input).value.strip() or "127.0.0.1"
+        host = self.query_one("#webui_host", Input).value.strip() or "0.0.0.0"
         port = self.query_one("#webui_port", Input).value.strip() or "8787"
         self.app.data["webui_host"] = host
         self.app.data["webui_port"] = port
@@ -939,7 +939,7 @@ class WizardScreen(Screen):
         table.add_row("Sudo mode", mode_label)
         table.add_row("Personality", "set at first conversation (agent name + style)")
         webui = data.get("webui", True)
-        webui_host = data.get("webui_host", "127.0.0.1")
+        webui_host = data.get("webui_host", "0.0.0.0")
         webui_port = data.get("webui_port", "8787")
         table.add_row(
             "WebUI",
@@ -1033,14 +1033,14 @@ class WizardScreen(Screen):
         )
         if data.get("webui", True):
             url = data.get("webui_url") or (
-                f"http://{data.get('webui_host', '127.0.0.1')}:"
+                f"http://{data.get('webui_host', '0.0.0.0')}:"
                 f"{data.get('webui_port', '8787')}"
             )
             log.write("")
             log.write(f"[bold {EMERALD}]v WebUI dashboard:[/] {url}")
             log.write(
-                f"[{SLATE_DIM}]WSL2: open the link directly from Windows; for remote access "
-                "use an SSH tunnel (ssh -L 8787:127.0.0.1:8787 user@host).[/]"
+                f"[{SLATE_DIM}]Binds 0.0.0.0 by default - open http://<server-ip>:8787 "
+                "from anywhere (allow the port in the cloud firewall).[/]"
             )
         if data.get("failed"):
             log.write(f"[{RED}]Failed steps:[/] {', '.join(data['failed'])}")
@@ -1147,7 +1147,7 @@ class HoudiniInstaller(App):
             "secrets_count": 0,
             "sudo_mode": "restricted",
             "webui": True,
-            "webui_host": "127.0.0.1",
+            "webui_host": "0.0.0.0",
             "webui_port": "8787",
             "memory": True,
             "failed": [],
