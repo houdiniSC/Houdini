@@ -901,6 +901,19 @@ class LiveInstaller:
             ok = venv_ok and await self._sh(
                 f"{py} -m pip install -q mitmproxy {pw_spec}"
             )
+            if not ok and pw_ver:
+                # npm ships patch releases PyPI never gets (e.g. npm 1.58.2
+                # vs PyPI 1.58.0 -> 1.59.0). Same minor = same chromium
+                # revision, so fall back to the nearest PyPI minor range.
+                _mm = ".".join(pw_ver.split(".")[:2])
+                _next = _mm.rsplit(".", 1)[0] + "." + str(int(_mm.split(".")[1]) + 1)
+                self.on_log(
+                    f"playwright=={pw_ver} not on PyPI — "
+                    f"falling back to >={_mm},<{_next}"
+                )
+                ok = venv_ok and await self._sh(
+                    f"{py} -m pip install -q mitmproxy 'playwright>={_mm},<{_next}'"
+                )
             if ok:
                 self.on_log(
                     "installing Chromium system deps (root) + browsers (agent user)..."
