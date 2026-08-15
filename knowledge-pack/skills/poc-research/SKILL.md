@@ -13,13 +13,54 @@ cross-PoC comparison & chaining next, and the **vendor fix diff** last — the
 diff is the most reliable oracle because the patch itself shows the exact
 vulnerable logic, even when no PoC exists.
 
-## Phase 0 — Gather everything (parallel, cheap)
+## Phase 0 — Gather everything (ACTIVE WEB SEARCH FIRST, then local tools)
 
-1. Local helpers: `cve2poc`, vulners API (header `X-Api-Key` — see toolkit)
-2. GitHub code search (search by CVE id, product + version, error string)
-3. Exploit-DB, PacketStorm, NVD references, GitHub security advisories
-4. Vendor advisories + changelogs + security bulletins
-5. Web search: `<product> <version> exploit poc CVE`
+Local helpers (cve2poc, vulners API) go stale and hit quota walls —
+treat them as a fallback, never as the primary source. Your **live web
+search keys** find fresh PoCs, writeups, and patches the day they land.
+Keys live in `~/.hermes/toolkit/keys/<service>.key` (masked in
+`inventory.yaml` — read the file when you use it).
+
+```bash
+K=~/.hermes/toolkit/keys   # key dir; read what exists first: ls $K
+Q='CVE-2024-xxxx OR "<product>" "<version>" exploit PoC'   # build the query
+
+# 1) SerpAPI — Google results (pages, GitHub, blogs, advisories)
+SERP=$(cat $K/serpapi.key 2>/dev/null)
+[ -n "$SERP" ] && curl -s "https://serpapi.com/search.json?engine=google&q=$(python3 -c "import urllib.parse,sys;print(urllib.parse.quote(sys.argv[1]))" "$Q")&num=20&api_key=$SERP" \
+  | jq -r '.organic_results[]? | "\(.link)  |  \(.title)"'
+
+# 2) Brave Search API — independent index, good for fresh PoCs
+BRAVE=$(cat $K/brave.key 2>/dev/null)
+[ -n "$BRAVE" ] && curl -s "https://api.search.brave.com/res/v1/web/search?q=$(python3 -c "import urllib.parse,sys;print(urllib.parse.quote(sys.argv[1]))" "$Q")&count=20" \
+  -H "Accept: application/json" -H "X-Subscription-Token: $BRAVE" \
+  | jq -r '.web.results[]? | "\(.url)  |  \(.title)"'
+
+# 3) GitHub API — repositories, code, issues, commits (token: 5000 req/h
+#    instead of 60; also unlocks code search)
+GHT=$(cat $K/github.key 2>/dev/null)
+AUTH=(); [ -n "$GHT" ] && AUTH=(-H "Authorization: Bearer $GHT")
+curl -s "https://api.github.com/search/repositories?q=${Q// /+}&per_page=20" "${AUTH[@]}" | jq -r '.items[]? | .html_url'
+curl -s "https://api.github.com/search/issues?q=${Q// /+}&per_page=20" "${AUTH[@]}" | jq -r '.items[]? | .html_url'
+[ -n "$GHT" ] && curl -s "https://api.github.com/search/code?q=${Q// /+}&per_page=20" "${AUTH[@]}" | jq -r '.items[]? | .html_url'
+# commits/PRs touching the CVE (best early signal — often links the fix diff)
+curl -s "https://api.github.com/search/commits?q=${Q// /+}&per_page=20" "${AUTH[@]}" | jq -r '.items[]? | .html_url'
+
+# 4) NVD + Exploit-DB + PacketStorm directly (no quota, public JSON)
+curl -s "https://services.nvd.nist.gov/rest/json/cves/2.0?cveId=CVE-2024-xxxx" | jq -r '.vulnerabilities[0].cve | {description: .descriptions[0].value, refs: [.references[].url]}'
+curl -s "https://gitlab.com/exploit-database/exploitdb/-/raw/main/files_exploits.csv" | grep -i "<cve-or-keyword>"
+
+# 5) ONLY THEN the local helpers: cve2poc, vulners (header X-Api-Key — see
+#    toolkit) — they cover history; the web search above covers the present.
+```
+
+Search query recipes (run several in parallel — different angles):
+
+- `"<CVE>" exploit` / `"<CVE>" poc github`
+- `"<product>" "<version>" vulnerability`
+- `"<product>" security advisory patch`
+- `site:github.com "<CVE>"`
+- `"<CVE>" diff patch commit`
 
 Save every PoC variant found: `~/recon/<target>/pocs/<name>-<sha1>.py|.sh|.md`.
 Collect MANY variants of the same CVE — different authors cover different
