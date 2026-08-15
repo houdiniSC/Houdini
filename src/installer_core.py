@@ -698,6 +698,14 @@ class LiveInstaller:
             # wizard; the retry loop below re-runs.
             _py_ver = f"{sys.version_info.major}.{sys.version_info.minor}"
             for attempt in (1, 2, 3):
+                if attempt == 1:
+                    # A previous failed attempt can leave a half-created
+                    # /usr/local/lib/hermes-agent behind; install.sh then
+                    # refuses ("Directory exists but is not a git
+                    # repository"). Clean it once before the first try.
+                    await self._sh(
+                        "sudo rm -rf /usr/local/lib/hermes-agent 2>/dev/null; true"
+                    )
                 ok = await self._sh(
                     "curl -fsSL https://hermes-agent.nousresearch.com/install.sh "
                     f"| sed 's/^PYTHON_VERSION=\\\"3.11\\\"/PYTHON_VERSION=\\\"{_py_ver}\\\"/' "
