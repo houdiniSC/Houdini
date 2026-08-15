@@ -20,7 +20,7 @@ skills:
     description: "Workspace bootstrap — on first contact, set up the private chat as home_user (flat, fixed message conventions) and/or the group as home_channel (forum topics). Tells DM users that a group gives an organized workspace."
     file: first-run-setup/SKILL.md
   poc-research:
-    description: "How to research, analyze, adapt, and execute published Proof-of-Concept exploits safely, with source-code review as the last resort."
+    description: "PoC research & engineering — try published PoCs, cross-compare & chain them into a working exploit, then derive the flaw from the vendor's own fix diff as the final source of truth"
     file: poc-research/SKILL.md
   recon-playbook:
     description: "Standard web recon methodology — scoping, passive enumeration, tech detection, targeted scanning, validation, reporting. Target-agnostic."
