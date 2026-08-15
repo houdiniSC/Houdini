@@ -922,8 +922,14 @@ class LiveInstaller:
                     f"sudo {py} -m playwright install-deps chromium"
                 )
             if ok:
+                # Playwright rejects OS releases newer than it knows
+                # (ubuntu26.04-x64) - override to the closest supported
+                # platform so install-deps/chromium still resolve.
                 ok = await self._sh(
-                    f"{py} -m playwright install chromium"
+                    f"{py} -m playwright install chromium",
+                    env={
+                        "PLAYWRIGHT_HOST_PLATFORM_OVERRIDE": "ubuntu24.04-x64",
+                    },
                 )
             if ok:
                 script = HERMES_HOME / "toolkit" / "tools" / "browser-capture.py"
@@ -1121,7 +1127,13 @@ class LiveInstaller:
             # hermes treats a TTY stdin as interactive and blocks on prompts
             # (e.g. "start now?"). /dev/null forces its non-interactive path.
             ok = await self._sh("hermes gateway install < /dev/null", env=env)
-            ok = await self._sh("hermes gateway start < /dev/null", env=env) and ok
+            # ALWAYS restart, never just start: Hermes' install.sh launched
+            # the gateway mid-install while ~/.hermes files (state.db among
+            # them) were still being replaced - the early process holds fds
+            # to DELETED inodes and every write then fails with
+            # "attempt to write a readonly database". A fresh restart opens
+            # clean handles on the final files.
+            ok = await self._sh("hermes gateway restart < /dev/null", env=env) and ok
             return ok
 
         if key == "webui":
