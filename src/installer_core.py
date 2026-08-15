@@ -578,8 +578,13 @@ class LiveInstaller:
             ("mobile", "Installing mobile toolchain"),
             ("memory", "Enabling local memory"),
             ("toolkit", "Generating tool inventory"),
-            ("gateway", "Starting gateway"),
             ("webui", "Installing WebUI dashboard"),
+            # gateway MUST run last: Hermes' install.sh starts it mid-install
+            # while ~/.hermes is still being rebuilt - the early process
+            # holds fds to deleted state.db inodes and every write fails
+            # with "readonly database". We stop it after the hermes step and
+            # start it fresh only here, when all files are final.
+            ("gateway", "Starting gateway"),
         ]
         for key, label in steps:
             self.on_log(f"● {label} ...")
@@ -697,6 +702,16 @@ class LiveInstaller:
                     "| timeout 1200 bash -s -- --non-interactive --skip-setup --skip-browser"
                 )
                 if ok:
+                    # install.sh already started the gateway service. Stop
+                    # it NOW: ~/.hermes files (state.db included) are still
+                    # being replaced by later steps, and a process started
+                    # here would hold fds to deleted inodes (readonly-db
+                    # writes later). The dedicated final "gateway" step
+                    # restarts it cleanly when everything is in place.
+                    if tool_path("hermes"):
+                        await self._sh(
+                            "hermes gateway stop < /dev/null >/dev/null 2>&1; true"
+                        )
                     return True
                 if tool_path("hermes"):
                     self.on_log("Hermes install retry succeeded via leftover artifacts")
