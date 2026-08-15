@@ -687,11 +687,13 @@ class LiveInstaller:
             # Flaky networks drop PyPI/GitHub connections mid-fetch; retry
             # the whole installer a few times before declaring failure.
             #
-            # --skip-browser: Hermes' install.sh would pull Playwright via npm
-            # (Node) whose extract froze on cloud images (Node 26 bug). Our
-            # own "browser" step installs the SAME Playwright version through
-            # pip/Python - stable zipfile extraction - so the browser engine
-            # is always installed by Python, never Node.
+            # setsid: install.sh probes /dev/tty directly (open, not a read)
+            # before its gateway questions. As a background job under the
+            # TUI that open triggers SIGTTIN and freezes the whole step at
+            # the same spot every time. setsid detaches from the controlling
+            # terminal so the probe fails fast (ENXIO) and the script skips
+            # its gateway stage cleanly - OUR final "gateway" step installs
+            # and starts the service instead (the "yes" answer, effectively).
             # timeout 1200: hard cap - a frozen child must never stall the
             # wizard; the retry loop below re-runs.
             _py_ver = f"{sys.version_info.major}.{sys.version_info.minor}"
@@ -699,7 +701,7 @@ class LiveInstaller:
                 ok = await self._sh(
                     "curl -fsSL https://hermes-agent.nousresearch.com/install.sh "
                     f"| sed 's/^PYTHON_VERSION=\\\"3.11\\\"/PYTHON_VERSION=\\\"{_py_ver}\\\"/' "
-                    "| timeout 1200 bash -s -- --non-interactive --skip-setup --skip-browser"
+                    "| timeout 1200 setsid bash -s -- --non-interactive --skip-setup --skip-browser < /dev/null"
                 )
                 if ok:
                     # NOTE: install.sh starts the gateway service here, but
