@@ -26,7 +26,7 @@ terminal:
 compression:
   enabled: true
   progress_notices: false
-  threshold: 0.5
+  threshold: 0.3
   target_ratio: 0.2
   protect_last_n: 20
   protect_first_n: 3
