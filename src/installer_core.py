@@ -585,6 +585,7 @@ class LiveInstaller:
             # with "readonly database". We stop it after the hermes step and
             # start it fresh only here, when all files are final.
             ("gateway", "Starting gateway"),
+            ("dbcheck", "Hardening state.db (trigram-off)"),
         ]
         for key, label in steps:
             self.on_log(f"● {label} ...")
@@ -1175,6 +1176,33 @@ class LiveInstaller:
             # "attempt to write a readonly database". A fresh restart opens
             # clean handles on the final files.
             ok = await self._sh("hermes gateway restart < /dev/null", env=env) and ok
+            return ok
+
+        if key == "dbcheck":
+            # SQLite >= 3.46 (Ubuntu 26.04, all recent python-build-standalone
+            # builds) reports Hermes' messages_fts_trigram as malformed and
+            # repeatedly rebuilds it, corrupting pages and slowing every DB
+            # operation (NousResearch/hermes-agent #86027/#82867/#60747).
+            # Hermes supports 'trigram off' natively, so drop the index right
+            # after first start - before it can bloat/corrupt. Harmless when
+            # the tables don't exist yet.
+            self.on_log("dropping trigram FTS index (SQLite 3.46+ conflict)")
+            py = "/usr/local/lib/hermes-agent/venv/bin/python"
+            if not os.path.exists(py):
+                py = "python3"
+            script = (
+                "import sqlite3, pathlib;"
+                "db = pathlib.Path.home() / '.hermes' / 'state.db';"
+                "c = sqlite3.connect(db);"
+                "tabs = [r[0] for r in c.execute(\"SELECT name FROM sqlite_master "
+                "WHERE name LIKE 'messages_fts_trigram%'\")];"
+                "[c.execute(f'DROP TABLE IF EXISTS \\\"{t}\\\"') for t in tabs];"
+                "c.commit();"
+                "q = c.execute('PRAGMA quick_check').fetchone()[0];"
+                "print(f'trigram dropped: {len(tabs)} tables, quick_check: {q}');"
+                "c.close()"
+            )
+            ok = await self._sh(f"{py} -c {shlex.quote(script)}")
             return ok
 
         if key == "webui":
