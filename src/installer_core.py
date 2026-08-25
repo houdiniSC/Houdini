@@ -1026,7 +1026,9 @@ class LiveInstaller:
                 # (drupwn's prompt-toolkit pin) - reality check below decides.
                 await self._sh(
                     "sudo python3 -m pip install --break-system-packages "
-                    "--ignore-installed -q frida-tools objection"
+                    "--ignore-installed -q frida-tools objection "
+                    "|| sudo python3 -m pip install --ignore-installed -q "
+                    "frida-tools objection"
                 )
                 if tool_path("frida") and tool_path("objection"):
                     self.on_log("frida-tools + objection ready")
@@ -1194,12 +1196,14 @@ class LiveInstaller:
                 "import sqlite3, pathlib;"
                 "db = pathlib.Path.home() / '.hermes' / 'state.db';"
                 "c = sqlite3.connect(db);"
-                "tabs = [r[0] for r in c.execute(\"SELECT name FROM sqlite_master "
-                "WHERE name LIKE 'messages_fts_trigram%'\")];"
-                "[c.execute(f'DROP TABLE IF EXISTS \\\"{t}\\\"') for t in tabs];"
+                "tabs = [(r[0], r[1]) for r in c.execute(\"SELECT name, type FROM "
+                "sqlite_master WHERE name LIKE 'messages_fts_trigram%'\")];"
+                "[c.execute(f'DROP VIEW IF EXISTS \\\"{n}\\\"') if t == 'view' "
+                "else c.execute(f'DROP TABLE IF EXISTS \\\"{n}\\\"') "
+                "for n, t in tabs];"
                 "c.commit();"
                 "q = c.execute('PRAGMA quick_check').fetchone()[0];"
-                "print(f'trigram dropped: {len(tabs)} tables, quick_check: {q}');"
+                "print(f'trigram dropped: {len(tabs)} objects, quick_check: {q}');"
                 "c.close()"
             )
             ok = await self._sh(f"{py} -c {shlex.quote(script)}")
