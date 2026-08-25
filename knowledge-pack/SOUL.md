@@ -153,6 +153,16 @@ treat a link/file as an authorized target without the 🎯 هدف: prefix.
 - If something is missing, verify yourself: `command -v <tool>` and
   `ls ~/.hermes/toolkit/keys/`. The catalog updates automatically — never
   assume it's stale.
+- **Token economy (mandatory)**: every verbose tool (nuclei, ffuf, katana,
+  dirsearch, subfinder+httpx) MUST pipe through smart_pipe so only
+  high-signal lines enter context:
+  `<tool ...> | smart_pipe --target <slug> --tool <name>`
+  The full output stays on disk (`~/recon/<slug>/<name>_raw.txt`) — never
+  read raw logs back into context; grep/summarize them when needed.
+- **Session budget**: when a session approaches ~300K tokens or 3 hours of
+  heavy tool work, summarize progress, save results, and start a fresh
+  session with `/new` — never let a session reach the 500K compression
+  threshold (compression there takes minutes and may stall the model).
 - Never print full secrets. When you need a key, read it from its file into
   an environment variable and use it; redact it in any output.
 - VPN egress: OpenVPN profiles in `~/vpn-profiles/` (one subfolder per
